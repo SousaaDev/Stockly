@@ -1,0 +1,154 @@
+/* perfil.css - Organizado e otimizado */
+
+/* Reset e Estilos Globais */
+body {
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f8f9fa;
+    color: #343a40;
+}
+
+/* Variáveis CSS para cores e valores repetidos */
+:root {
+    --primary-color: #1e7376;
+    --primary-hover: #3e9e9c;
+    --white: #ffffff;
+    --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    --border-radius: 5px;
+    --spacing-small: 5px;
+    --spacing-medium: 10px;
+    --spacing-large: 20px;
+}
+
+/* Layout do Container Principal */
+.perfil-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: var(--spacing-large);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.perfil-info {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Seções do Perfil */
+.perfil-section {
+    width: 100%;
+    background-color: var(--white);
+    padding: var(--spacing-large);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    margin-bottom: var(--spacing-large);
+    text-align: center;
+}
+
+.perfil-section h2 {
+    margin-top: 0;
+    color: var(--primary-color);
+}
+
+.perfil-section p, 
+.perfil-section ul {
+    margin: var(--spacing-medium) 0;
+}
+
+/* Listas */
+.perfil-section ul {
+    list-style: none;
+    padding: 0;
+}
+
+.perfil-section ul li {
+    margin: var(--spacing-small) 0;
+}
+
+/* Links */
+.perfil-section ul li a {
+    color: var(--primary-color);
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.perfil-section ul li a:hover {
+    color: var(--primary-hover);
+}
+
+/* Formulários */
+.perfil-section form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.perfil-section form label {
+    margin: var(--spacing-medium) 0 var(--spacing-small);
+    width: 100%;
+    text-align: left;
+}
+
+.perfil-section form input {
+    padding: var(--spacing-medium);
+    border: 1px solid #ccc;
+    border-radius: var(--border-radius);
+    width: 100%;
+    margin-bottom: var(--spacing-medium);
+}
+
+/* Botões */
+.perfil-section form button,
+.btn-remover-foto {
+    padding: var(--spacing-medium);
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: background-color 0.3s;
+    width: 100%;
+}
+
+.perfil-section form button {
+    margin-top: var(--spacing-large);
+    background-color: var(--primary-color);
+    color: var(--white);
+}
+
+.perfil-section form button:hover {
+    background-color: var(--primary-hover);
+}
+
+.btn-remover-foto {
+    background-color: #ff4d4d;
+    color: var(--white);
+    margin-top: var(--spacing-medium);
+}
+
+.btn-remover-foto:hover {
+    background-color: #ff1a1a;
+}
+
+/* Imagens de Perfil */
+.foto-perfil img {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: var(--spacing-large);
+    border: 5px solid var(--primary-color);
+}
+
+/* Foto no dropdown/header */
+.perfil-foto {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-right: var(--spacing-medium);
+    vertical-align: middle;
+    border: 2px solid var(--white);
+}

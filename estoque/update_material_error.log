@@ -1,0 +1,13 @@
+Unknown column 'descricao' in 'field list'
+#0 C:\xampp\htdocs\Site4\estoque\update_material.php(102): mysqli->prepare('INSERT INTO des...')
+#1 {main}Material não selecionado.
+#0 {main}Material não selecionado.
+#0 {main}Material não selecionado.
+#0 {main}Material não selecionado.
+#0 {main}Valor de estoque inválido.
+#0 {main}Valor de estoque inválido.
+#0 {main}Valor de estoque inválido.
+#0 {main}Valor de estoque inválido.
+#0 {main}Valor de estoque inválido.
+#0 {main}Valor de estoque inválido.
+#0 {main}

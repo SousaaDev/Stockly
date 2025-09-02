@@ -1,0 +1,176 @@
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    background-color: var(--gray-100); /* Usando a variável de cor do primeiro CSS */
+    color: var(--gray-800); /* Usando a variável de cor do primeiro CSS */
+}
+
+h1, h2 {
+    color: var(--gray-900); /* Usando a variável de cor do primeiro CSS */
+    text-align: center;
+}
+
+.search-container {
+    margin: 20px auto;
+    max-width: 800px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#search-input {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px;
+    border: 2px solid #5ea7a5;
+    border-radius: 5px;
+    font-size: 16px;
+    outline: none;
+}
+
+#categoria-filter, #filtro-ordenacao {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px;
+    border: 2px solid #5ea7a5;
+    border-radius: 5px;
+    font-size: 16px;
+    outline: none;
+}
+
+#search-button {
+    width: 100px;
+    padding: 12px;
+    background-color: #5ea7a5;
+    color: white;
+    border: 2px solid #5ea7a5;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+#form-container {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+form {
+    background: white; /* Mantendo o fundo branco */
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 500px;
+    margin: 10px auto;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: var(--gray-800); /* Usando a variável de cor do primeiro CSS */
+}
+
+input, select, button {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid var(--gray-300); /* Usando a variável de cor do primeiro CSS */
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+button {
+    background-color: var(--primary); /* Usando a variável de cor do primeiro CSS */
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: var(--primary-dark); /* Usando a variável de cor do primeiro CSS */
+}
+
+#resultados {
+    background: white; /* Mantendo o fundo branco */
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    margin-top: 20px;
+}
+
+#resultados p {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--gray-900); /* Usando a variável de cor do primeiro CSS */
+}
+
+#historico-container {
+    text-align: center;
+    margin-top: 20px;
+}
+
+#historico-container a {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: var(--primary); /* Usando a variável de cor do primeiro CSS */
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+#historico-container a:hover {
+    background-color: var(--primary-dark); /* Usando a variável de cor do primeiro CSS */
+}
+
+table {
+    width: 100%;
+    max-width: 800px;
+    margin: 20px auto;
+    border-collapse: collapse;
+    background: white; /* Mantendo o fundo branco */
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+table th, table td {
+    padding: 10px;
+    border: 1px solid var(--gray-300); /* Usando a variável de cor do primeiro CSS */
+    text-align: left;
+}
+
+/* === RESPONSIVO - ADEQUAÇÃO PARA TELAS PEQUENAS === */
+@media (max-width: 768px) {
+    #resultados {
+        width: 99%; /* Garante que o conteúdo ocupe 100% da tela */
+        padding: 10px; /* Ajusta o padding para dispositivos móveis */
+    }
+
+    /* Contêiner da tabela com rolagem horizontal */
+    #table-container {
+        width: 100%; /* Garante que o contêiner ocupe 100% da largura */
+        overflow-x: auto; /* Permite a rolagem horizontal dentro do contêiner */
+        -webkit-overflow-scrolling: touch; /* Suaviza a rolagem no iOS */
+    }
+
+    /* Tabela */
+    table {
+        width: 95%; /* Garante que a tabela ocupe 100% da largura */
+        word-wrap: break-word; /* Quebra palavras longas, se necessário */
+    }
+
+
+    }
+
+
+
+
+
+
