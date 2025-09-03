@@ -164,7 +164,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt->close();
         }
     }
-}
+}// inicio do html
 ?>
 
 <!DOCTYPE html>
