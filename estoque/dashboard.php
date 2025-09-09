@@ -59,7 +59,7 @@ $dados_dashboard = array(
     --info: #219ebc;
     --light: #f8f9fa;
     --dark: #343a40;
-    --white: #ffffff;
+    --white: #f8f9fa;
     --gray-100: #f8f9fa;
     --gray-200: #e9ecef;
     --gray-300: #dee2e6;
@@ -112,7 +112,7 @@ $dados_dashboard = array(
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    background-color: #fff;
     min-height: 100vh;
     color: var(--text-color);
     line-height: 1.6;
@@ -546,22 +546,6 @@ canvas {
     pointer-events: none;
 }
 
-.empty-state-icon {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 24px;
-    animation: pulse 2s infinite;
-}
-
-.empty-state-icon i {
-    font-size: 36px;
-    color: white;
-}
 
 @keyframes pulse {
     0%, 100% { transform: scale(1); opacity: 1; }
@@ -1126,9 +1110,7 @@ canvas {
                 <!-- Estado vazio para vendas -->
                 <?php if (!$dados_dashboard['tem_dados_grafico']): ?>
                 <div class="chart-empty-state">
-                    <div class="empty-state-icon">
-                        <i class="fas fa-chart-line"></i>
-                    </div>
+
                     <h3 class="empty-state-title">Sem Vendas Registradas</h3>
                     <p class="empty-state-message">
                         Comece registrando suas primeiras vendas para visualizar o desempenho do seu negócio em tempo real.
@@ -1165,9 +1147,6 @@ canvas {
                 <!-- Estado vazio para produtos -->
                 <?php if (!$dados_dashboard['tem_produtos_vendidos']): ?>
                 <div class="chart-empty-state">
-                    <div class="empty-state-icon">
-                        <i class="fas fa-trophy"></i>
-                    </div>
                     <h3 class="empty-state-title">Nenhum Produto Vendido</h3>
                     <p class="empty-state-message">
                         Adicione produtos ao seu estoque e comece a vender para ver o ranking dos mais vendidos.
@@ -1206,9 +1185,7 @@ canvas {
                 <!-- Estado vazio para categorias -->
                 <?php if (!$dados_dashboard['tem_categorias']): ?>
                 <div class="chart-empty-state">
-                    <div class="empty-state-icon">
-                        <i class="fas fa-sitemap"></i>
-                    </div>
+
                     <h3 class="empty-state-title">Sem Categorias</h3>
                     <p class="empty-state-message">
                         Organize seu estoque criando categorias e adicionando produtos para uma melhor gestão.
