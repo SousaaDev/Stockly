@@ -306,6 +306,19 @@ $estoque_stats['total_itens'] = garantirValorNumerico($estoque_stats['total_iten
 $vendas_mes['receita_total'] = garantirValorNumerico($vendas_mes['receita_total']);
 $vendas_mes['lucro_bruto'] = garantirValorNumerico($vendas_mes['lucro_bruto']);
 
+// Criar variável $produtos_vendidos para compatibilidade com dashboard.php
+$produtos_vendidos = $dashboard_data['top_produtos'];
+
+// Filtrar produtos vendidos para remover entradas vazias ou sem vendas
+$produtos_vendidos = array_filter($produtos_vendidos, function($produto) {
+    return isset($produto['total_vendido']) && $produto['total_vendido'] > 0;
+});
+
+// Garantir que $produtos_vendidos não seja null
+if (!is_array($produtos_vendidos)) {
+    $produtos_vendidos = [];
+}
+
 // Fechar as conexões
 $stmt_vendas->close();
 $stmt_vendas_anterior->close();

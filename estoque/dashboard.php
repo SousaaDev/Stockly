@@ -42,11 +42,31 @@ $dados_dashboard = array(
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard - Stockly</title>
     <link rel="stylesheet" href="../css/styleprincipal.css">
-    <link rel="stylesheet" href="dashboard.css">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
  /* dashboard.css - Versão Corrigida */
+
+/* Reset básico */
+* {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    outline: 0;
+    font-size: 100%;
+    vertical-align: baseline;
+    background: transparent;
+    box-sizing: border-box;
+}
+
+body {
+    line-height: 1;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    color: #000;
+    background-color: #fff;
+}
 
 /* Variáveis CSS */
 :root {
@@ -103,20 +123,8 @@ $dados_dashboard = array(
     --transition-fast: all 0.15s ease;
 }
 
-/* Reset básico */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
 
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #fff;
-    min-height: 100vh;
-    color: var(--text-color);
-    line-height: 1.6;
-}
+
 
 /* Container principal do dashboard */
 .dashboard-container {
