@@ -40,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['registrar_venda'])) {
     // Validar os dados do formulário
     $material_id = $_POST['material'];
     $quantidade_venda = $_POST['quantidade_venda'];
-    $valor_unitario_venda = str_replace(',', '.', $_POST['valor_unitario_venda']);
+    $valor_unitario_estoque = str_replace(',', '.', $_POST['valor_unitario_estoque']);
     
     // Verificar se temos estoque suficiente
     $sql_verifica_estoque = "SELECT quantidade, valor_unitario_estoque FROM ga3_materiais WHERE id = ?";
@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['registrar_venda'])) {
 
     if ($material && $material['quantidade'] >= $quantidade_venda) {
         // Calcular o valor total da venda e o lucro bruto
-        $valor_total_venda = $quantidade_venda * $valor_unitario_venda;
+        $valor_total_venda = $quantidade_venda * $valor_unitario_estoque;
         $custo_total = $quantidade_venda * $material['valor_unitario_estoque'];
         $lucro_bruto = $valor_total_venda - $custo_total;
         $data_atual = date('Y-m-d');
@@ -156,7 +156,7 @@ $total_vendas_hoje = $vendas_hoje['total_vendas'] ?? 0;
 $valor_total_hoje = number_format(($vendas_hoje['valor_total'] ?? 0), 2, ',', '.');
 
 // Obter lista de materiais disponíveis
-$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_estoque, m.valor_unitario_venda, c.nome as categoria 
+$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_estoque, m.valor_unitario_estoque, c.nome as categoria 
                  FROM ga3_materiais m 
                  LEFT JOIN ga3_categorias c ON m.categoria_id = c.id 
                  WHERE m.quantidade > 0 
@@ -169,10 +169,11 @@ while ($row = $result_materiais->fetch_assoc()) {
 }
 
 // Obter as últimas vendas
+// Obter as últimas vendas
 $sql_ultimas_vendas = "SELECT t.id, t.material_id, m.descricao, t.quantidade, t.valor_venda, t.data_venda, t.data_hora 
                      FROM ga3_transacoes t 
                      JOIN ga3_materiais m ON t.material_id = m.id 
-                     ORDER BY t.data_venda DESC 
+                     ORDER BY t.data_hora DESC 
                      LIMIT 5";
 $result_ultimas_vendas = $conn->query($sql_ultimas_vendas);
 $ultimas_vendas = [];
@@ -181,6 +182,20 @@ while ($row = $result_ultimas_vendas->fetch_assoc()) {
     $ultimas_vendas[] = $row;
 }
 
+
+
+// Obter lista de materiais disponíveis
+$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_estoque, m.valor_unitario_estoque, c.nome as categoria 
+                 FROM ga3_materiais m 
+                 LEFT JOIN ga3_categorias c ON m.categoria_id = c.id 
+                 WHERE m.quantidade > 0 
+                 ORDER BY m.descricao";
+$result_materiais = $conn->query($sql_materiais);
+$materiais = [];
+
+while ($row = $result_materiais->fetch_assoc()) {
+    $materiais[] = $row;
+}   
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -680,16 +695,18 @@ h1 {
             <div id="form-container" class="card">
                 <h2><i class="fas fa-plus-circle"></i> Nova Transação</h2>
                 <form id="transacao-form" method="POST" action="vendas.php">
-                    <label for="material"><i class="fas fa-box"></i> Material:</label>
-                    <select id="material" name="material" required>
-                        <option value="">Selecione um material</option>
-                        <?php foreach($materiais as $material): ?>
-                            <option value="<?php echo $material['id']; ?>" 
-                                    data-quantity="<?php echo $material['quantidade']; ?>"
-                                    data-price="<?php echo number_format($material['valor_unitario_venda'], 2, ',', '.'); ?>">
-                                <?php echo htmlspecialchars($material['descricao']); ?> (<?php echo $material['quantidade']; ?> un.)
-                            </option>
-                        <?php endforeach; ?>
+                <label for="material"><i class="fas fa-box"></i> Material:</label>
+<select id="material" name="material" required>
+    <option value="">Selecione um material</option>
+    <?php foreach($materiais as $material): ?>
+        <option value="<?php echo $material['id']; ?>" 
+                data-quantity="<?php echo $material['quantidade']; ?>"
+                data-price="<?php echo $material['valor_unitario_estoque'] ? number_format($material['valor_unitario_estoque'], 2, ',', '.') : '0,00'; ?>">
+            <?php echo htmlspecialchars($material['descricao']); ?> (<?php echo $material['quantidade']; ?> un.)
+        </option>
+    <?php endforeach; ?>
+</select>
+                         <!-- This extra endforeach is causing the error -->
                     </select>
                     
                     <label for="quantidade_venda"><i class="fas fa-sort-amount-up"></i> Quantidade Vendida:</label>
@@ -699,8 +716,8 @@ h1 {
                         <i class="fas fa-info-circle"></i> Quantidade disponível: <span id="qtd-disp-valor">0</span>
                     </div>
                     
-                    <label for="valor_unitario_venda"><i class="fas fa-dollar-sign"></i> Valor Unitário de Venda (R$):</label>
-                    <input type="text" id="valor_unitario_venda" name="valor_unitario_venda" required min="0.01" step="0.01">
+                    <label for="valor_unitario_estoque"><i class="fas fa-dollar-sign"></i> Valor Unitário de Venda (R$):</label>
+                    <input type="text" id="valor_unitario_estoque" name="valor_unitario_estoque" required >
             
                     <div class="form-actions">
                         <button type="submit" name="registrar_venda"><i class="fas fa-check"></i> Registrar Venda</button>
@@ -785,31 +802,33 @@ h1 {
 
 
     <script>
-// JavaScript completo corrigido para vendas.php
-
-// Aguardar o carregamento completo do DOM
+// JavaScript completo e corrigido para vendas.php
 document.addEventListener('DOMContentLoaded', function() {
     
-    // ==================== DROPDOWN MENU ====================
+    // ==================== ELEMENTOS DOM ====================
+    const materialSelect = document.getElementById('material');
+    const qtdInput = document.getElementById('quantidade_venda');
+    const valorInput = document.getElementById('valor_unitario_estoque');
+    const transacaoForm = document.getElementById('transacao-form');
     const dropdownButton = document.getElementById('dropdownButton');
     const dropdownContent = document.getElementById('dropdownContent');
-    
+    const hamburgerMenu = document.getElementById('hamburgerMenu');
+    const offScreenMenu = document.getElementById('offScreenMenu');
+
+    // ==================== DROPDOWN MENU ====================
     if (dropdownButton && dropdownContent) {
-        // Adicionar event listener para o botão dropdown
         dropdownButton.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             dropdownContent.classList.toggle('show');
         });
 
-        // Fechar dropdown quando clicar fora
         document.addEventListener('click', function(event) {
             if (!dropdownButton.contains(event.target) && !dropdownContent.contains(event.target)) {
                 dropdownContent.classList.remove('show');
             }
         });
 
-        // Fechar dropdown ao pressionar ESC
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape' && dropdownContent.classList.contains('show')) {
                 dropdownContent.classList.remove('show');
@@ -818,24 +837,18 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ==================== MENU HAMBÚRGUER ====================
-    const hamburgerMenu = document.getElementById('hamburgerMenu');
-    const offScreenMenu = document.getElementById('offScreenMenu');
-    
     if (hamburgerMenu && offScreenMenu) {
-        // Event listener para o botão hambúrguer
         hamburgerMenu.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
             toggleMobileMenu();
         });
         
-        // Função para alternar o menu mobile
         function toggleMobileMenu() {
             offScreenMenu.classList.toggle('active');
             hamburgerMenu.classList.toggle('active');
         }
         
-        // Fechar menu mobile quando clicar fora
         document.addEventListener('click', function(event) {
             if (offScreenMenu.classList.contains('active') && 
                 !offScreenMenu.contains(event.target) && 
@@ -845,7 +858,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // Fechar menu mobile ao clicar em um link
         const mobileMenuLinks = offScreenMenu.querySelectorAll('a');
         mobileMenuLinks.forEach(link => {
             link.addEventListener('click', function() {
@@ -854,7 +866,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
 
-        // Fechar menu mobile ao pressionar ESC
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape' && offScreenMenu.classList.contains('active')) {
                 offScreenMenu.classList.remove('active');
@@ -863,18 +874,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ==================== FORMULÁRIO DE VENDAS ====================
-    const materialSelect = document.getElementById('material');
-    const qtdInput = document.getElementById('quantidade_venda');
-    const valorInput = document.getElementById('valor_unitario_venda');
-    const transacaoForm = document.getElementById('transacao-form');
-    
-    // Função para formatar valores como moeda brasileira
-    function formatarMoeda(valor) {
-        return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-    }
-    
-    // Função para atualizar informações do material selecionado
+    // ==================== SELEÇÃO DE MATERIAL ====================
     if (materialSelect) {
         materialSelect.addEventListener('change', function() {
             const qtdDispElement = document.getElementById('qtd-disp-valor');
@@ -889,23 +889,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     qtdDispElement.textContent = quantidadeDisponivel;
                 }
                 
-                // Definir valor unitário sugerido
-                if (valorInput && precoSugerido) {
-                    valorInput.value = precoSugerido;
+                // Preencher valor apenas se houver preço válido
+                if (valorInput) {
+                    if (precoSugerido && precoSugerido !== '0,00' && precoSugerido !== '' && precoSugerido !== 'null') {
+                        valorInput.value = precoSugerido;
+                    } else {
+                        valorInput.value = '';
+                        valorInput.placeholder = 'Digite o valor de venda';
+                    }
                 }
                 
-                // Ajustar valor máximo do input de quantidade
+                // Ajustar quantidade máxima
                 if (qtdInput) {
                     qtdInput.max = quantidadeDisponivel;
-                    qtdInput.value = ''; // Limpar campo
+                    qtdInput.value = '';
                 }
             } else {
-                // Resetar valores quando nenhum material está selecionado
-                if (qtdDispElement) {
-                    qtdDispElement.textContent = '0';
-                }
+                // Resetar valores
+                if (qtdDispElement) qtdDispElement.textContent = '0';
                 if (valorInput) {
                     valorInput.value = '';
+                    valorInput.placeholder = 'Digite o valor de venda';
                 }
                 if (qtdInput) {
                     qtdInput.value = '';
@@ -915,7 +919,44 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Validação de quantidade em tempo real
+    // ==================== FORMATAÇÃO SIMPLES DO VALOR ====================
+    if (valorInput) {
+        valorInput.addEventListener('input', function(e) {
+            let valor = this.value;
+            
+            // Permitir apenas números, vírgula e ponto
+            valor = valor.replace(/[^\d,.]/g, '');
+            
+            // Converter ponto em vírgula (para quem digitar com ponto)
+            valor = valor.replace(/\./g, ',');
+            
+            // Permitir apenas uma vírgula
+            const partes = valor.split(',');
+            if (partes.length > 2) {
+                valor = partes[0] + ',' + partes.slice(1).join('');
+            }
+            
+            // Limitar a 2 casas decimais após a vírgula
+            if (partes[1] && partes[1].length > 2) {
+                valor = partes[0] + ',' + partes[1].substring(0, 2);
+            }
+            
+            this.value = valor;
+        });
+        
+        // Validação apenas ao sair do campo
+        valorInput.addEventListener('blur', function() {
+            if (this.value === '') return;
+            
+            const numeroValor = parseFloat(this.value.replace(',', '.'));
+            if (isNaN(numeroValor) || numeroValor <= 0) {
+                alert('Por favor, insira um valor válido maior que zero.');
+                this.focus();
+            }
+        });
+    }
+    
+    // ==================== VALIDAÇÃO DE QUANTIDADE ====================
     if (qtdInput) {
         qtdInput.addEventListener('input', function() {
             const maxQuantidade = parseInt(this.max) || 1000;
@@ -932,66 +973,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Formatação de valor para moeda brasileira
-    if (valorInput) {
-        valorInput.addEventListener('input', function(e) {
-            let valor = this.value.replace(/[^\d,]/g, ''); // Remove tudo exceto dígitos e vírgula
-            
-            // Se não tem vírgula, adiciona
-            if (!valor.includes(',')) {
-                valor = valor.replace(/(\d+)(\d{2})$/, '$1,$2');
-            }
-            
-            // Garante que tenha pelo menos 2 casas decimais
-            if (valor.length > 0 && !valor.includes(',')) {
-                valor += ',00';
-            }
-            
-            this.value = valor;
-        });
-        
-        // Validação ao sair do campo
-        valorInput.addEventListener('blur', function() {
-            const valor = parseFloat(this.value.replace(',', '.'));
-            if (isNaN(valor) || valor <= 0) {
-                alert('Por favor, insira um valor válido maior que zero.');
-                this.focus();
-            }
-        });
-    }
-    
-    // Validação do formulário antes do envio
+    // ==================== VALIDAÇÃO DO FORMULÁRIO ====================
     if (transacaoForm) {
         transacaoForm.addEventListener('submit', function(e) {
             let isValid = true;
             let mensagemErro = '';
             
-            // Validar material selecionado
             if (!materialSelect || !materialSelect.value) {
                 isValid = false;
                 mensagemErro = 'Por favor, selecione um material.';
-            }
-            
-            // Validar quantidade
-            else if (!qtdInput || !qtdInput.value || parseInt(qtdInput.value) <= 0) {
+            } else if (!qtdInput || !qtdInput.value || parseInt(qtdInput.value) <= 0) {
                 isValid = false;
                 mensagemErro = 'Por favor, insira uma quantidade válida.';
-            }
-            
-            // Validar valor unitário
-            else if (!valorInput || !valorInput.value || parseFloat(valorInput.value.replace(',', '.')) <= 0) {
+            } else if (!valorInput || !valorInput.value || parseFloat(valorInput.value.replace(',', '.')) <= 0) {
                 isValid = false;
                 mensagemErro = 'Por favor, insira um valor unitário válido.';
             }
             
-            // Se houver erro, prevenir envio e mostrar mensagem
             if (!isValid) {
                 e.preventDefault();
                 alert(mensagemErro);
                 return false;
             }
             
-            // Confirmação final
             const material = materialSelect.options[materialSelect.selectedIndex].text;
             const quantidade = qtdInput.value;
             const valor = valorInput.value;
@@ -1013,11 +1017,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // ==================== ALERTAS AUTOMÁTICOS ====================
-    // Fechar alertas automaticamente após 5 segundos
     const alertas = document.querySelectorAll('.alert');
     if (alertas.length > 0) {
         alertas.forEach(function(alerta) {
-            // Adicionar botão de fechar
             const btnFechar = document.createElement('button');
             btnFechar.innerHTML = '&times;';
             btnFechar.style.cssText = 'background:none;border:none;font-size:20px;cursor:pointer;margin-left:10px;';
@@ -1027,7 +1029,6 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             alerta.appendChild(btnFechar);
             
-            // Auto-fechar após 5 segundos
             setTimeout(function() {
                 if (alerta.parentNode) {
                     alerta.style.opacity = '0';
@@ -1037,34 +1038,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // ==================== INICIALIZAÇÃO ====================
-    // Se houver material pré-selecionado, disparar evento change
-    if (materialSelect && materialSelect.selectedIndex > 0) {
-        materialSelect.dispatchEvent(new Event('change'));
-    }
-    
-    // Debug info (remover em produção)
     console.log('Sistema de vendas inicializado com sucesso!');
 });
 
 // ==================== FUNÇÕES GLOBAIS ====================
-
-// Função para debug (pode ser chamada no console)
-function debugMenu() {
-    const dropdown = document.getElementById('dropdownContent');
-    const hamburger = document.getElementById('hamburgerMenu');
-    const offscreen = document.getElementById('offScreenMenu');
-    
-    console.log('=== DEBUG MENU ===');
-    console.log('Dropdown:', dropdown ? 'Encontrado' : 'Não encontrado');
-    console.log('Hamburger:', hamburger ? 'Encontrado' : 'Não encontrado');
-    console.log('Off-screen:', offscreen ? 'Encontrado' : 'Não encontrado');
-    
-    if (dropdown) console.log('Dropdown classes:', dropdown.classList);
-    if (offscreen) console.log('Off-screen classes:', offscreen.classList);
-}
-
-// Função para resetar formulário
 function resetarFormulario() {
     const form = document.getElementById('transacao-form');
     if (form) {
@@ -1083,11 +1060,7 @@ document.addEventListener('submit', function(e) {
             return false;
         }
         formEnviado = true;
-        
-        // Resetar após 3 segundos
-        setTimeout(() => {
-            formEnviado = false;
-        }, 3000);
+        setTimeout(() => formEnviado = false, 3000);
     }
 });
     </script>
