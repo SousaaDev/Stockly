@@ -15,8 +15,6 @@ if ($conn->connect_error) {
 }
 
 // Iniciar a sessão
-
-
 if (!isset($_SESSION['usuario'])) {
     header('Location: login.php');
     exit();
@@ -32,36 +30,52 @@ if (!isset($usuario['foto_perfil']) || empty($usuario['foto_perfil'])) {
 }
 
 // Definir filtros padrão
-$filtro_material = isset($_GET['material']) ? $_GET['material'] : null;
+$filtro_categoria = isset($_GET['categoria']) ? $_GET['categoria'] : null;
 $filtro_valor_min = isset($_GET['valor_min']) ? $_GET['valor_min'] : null;
 $filtro_valor_max = isset($_GET['valor_max']) ? $_GET['valor_max'] : null;
+$filtro_quantidade_min = isset($_GET['quantidade_min']) ? $_GET['quantidade_min'] : null;
+$filtro_quantidade_max = isset($_GET['quantidade_max']) ? $_GET['quantidade_max'] : null;
 $filtro_ordem = isset($_GET['ordem']) ? $_GET['ordem'] : 'id_desc'; // Padrão: ID decrescente
 
-// Construir a consulta SQL com filtros
+// Construir a consulta SQL com filtros - usando tabela ga3_materiais
 $sql_where = [];
 $sql_params = [];
 $sql_types = "";
 
-$sql = "SELECT d.id, d.material_id, m.descricao, d.valor 
-        FROM ga3_despesas d 
-        JOIN ga3_materiais m ON d.material_id = m.id"; // Tabelas alteradas
+$sql = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_estoque, m.codigo_identificacao, 
+               c.nome as categoria_nome,
+               (m.quantidade * m.valor_unitario_estoque) as valor_total_estoque
+        FROM ga3_materiais m 
+        LEFT JOIN ga3_categorias c ON m.categoria_id = c.id";
 
-if ($filtro_material) {
-    $sql_where[] = "d.material_id = ?";
-    $sql_params[] = $filtro_material;
+if ($filtro_categoria) {
+    $sql_where[] = "m.categoria_id = ?";
+    $sql_params[] = $filtro_categoria;
     $sql_types .= "i";
 }
 
 if ($filtro_valor_min !== null && $filtro_valor_min !== '') {
-    $sql_where[] = "d.valor >= ?";
+    $sql_where[] = "m.valor_unitario_estoque >= ?";
     $sql_params[] = $filtro_valor_min;
     $sql_types .= "d";
 }
 
 if ($filtro_valor_max !== null && $filtro_valor_max !== '') {
-    $sql_where[] = "d.valor <= ?";
+    $sql_where[] = "m.valor_unitario_estoque <= ?";
     $sql_params[] = $filtro_valor_max;
     $sql_types .= "d";
+}
+
+if ($filtro_quantidade_min !== null && $filtro_quantidade_min !== '') {
+    $sql_where[] = "m.quantidade >= ?";
+    $sql_params[] = $filtro_quantidade_min;
+    $sql_types .= "i";
+}
+
+if ($filtro_quantidade_max !== null && $filtro_quantidade_max !== '') {
+    $sql_where[] = "m.quantidade <= ?";
+    $sql_params[] = $filtro_quantidade_max;
+    $sql_types .= "i";
 }
 
 if (!empty($sql_where)) {
@@ -71,10 +85,10 @@ if (!empty($sql_where)) {
 // Aplicar ordenação
 switch ($filtro_ordem) {
     case 'id_asc':
-        $sql .= " ORDER BY d.id ASC";
+        $sql .= " ORDER BY m.id ASC";
         break;
     case 'id_desc':
-        $sql .= " ORDER BY d.id DESC";
+        $sql .= " ORDER BY m.id DESC";
         break;
     case 'material_asc':
         $sql .= " ORDER BY m.descricao ASC";
@@ -83,13 +97,25 @@ switch ($filtro_ordem) {
         $sql .= " ORDER BY m.descricao DESC";
         break;
     case 'valor_asc':
-        $sql .= " ORDER BY d.valor ASC";
+        $sql .= " ORDER BY m.valor_unitario_estoque ASC";
         break;
     case 'valor_desc':
-        $sql .= " ORDER BY d.valor DESC";
+        $sql .= " ORDER BY m.valor_unitario_estoque DESC";
+        break;
+    case 'quantidade_asc':
+        $sql .= " ORDER BY m.quantidade ASC";
+        break;
+    case 'quantidade_desc':
+        $sql .= " ORDER BY m.quantidade DESC";
+        break;
+    case 'total_asc':
+        $sql .= " ORDER BY valor_total_estoque ASC";
+        break;
+    case 'total_desc':
+        $sql .= " ORDER BY valor_total_estoque DESC";
         break;
     default:
-        $sql .= " ORDER BY d.id DESC";
+        $sql .= " ORDER BY m.id DESC";
 }
 
 // Preparar e executar a consulta
@@ -102,16 +128,18 @@ if (!empty($sql_params)) {
 $stmt->execute();
 $result = $stmt->get_result();
 
-$despesas = array();
+$materiais = array();
 
 if ($result->num_rows > 0) {
     while($row = $result->fetch_assoc()) {
-        $despesas[] = $row;
+        $materiais[] = $row;
     }
 }
 
-// Calcular o total de despesas com os mesmos filtros
-$sql_total = "SELECT SUM(d.valor) as total_despesas FROM ga3_despesas d JOIN ga3_materiais m ON d.material_id = m.id"; // Tabelas alteradas
+// Calcular o total de custos de estoque com os mesmos filtros
+$sql_total = "SELECT SUM(m.quantidade * m.valor_unitario_estoque) as total_custos_estoque 
+              FROM ga3_materiais m 
+              LEFT JOIN ga3_categorias c ON m.categoria_id = c.id";
 
 if (!empty($sql_where)) {
     $sql_total .= " WHERE " . implode(" AND ", $sql_where);
@@ -125,40 +153,34 @@ if (!empty($sql_params)) {
 
 $stmt_total->execute();
 $result_total = $stmt_total->get_result();
-$total_despesas = 0;
+$total_custos_estoque = 0;
 
 if ($result_total->num_rows > 0) {
     $row = $result_total->fetch_assoc();
-    $total_despesas = $row['total_despesas'] ?: 0; // Garantir que não seja null
+    $total_custos_estoque = $row['total_custos_estoque'] ?: 0; // Garantir que não seja null
 }
 
-// Obter lista de materiais para o filtro
-$sql_materiais = "SELECT id, descricao FROM ga3_materiais ORDER BY descricao ASC"; // Tabela alterada
-$result_materiais = $conn->query($sql_materiais);
-$materiais = [];
+// Obter lista de categorias para o filtro
+$sql_categorias = "SELECT id, nome FROM ga3_categorias ORDER BY nome ASC";
+$result_categorias = $conn->query($sql_categorias);
+$categorias = [];
 
-if ($result_materiais->num_rows > 0) {
-    while($row = $result_materiais->fetch_assoc()) {
-        $materiais[] = $row;
+if ($result_categorias->num_rows > 0) {
+    while($row = $result_categorias->fetch_assoc()) {
+        $categorias[] = $row;
     }
-}
-
-// Exportação para PDF
-if (isset($_GET['export']) && $_GET['export'] == 'pdf') {
-    // Lógica de exportação para PDF permanece...
-    // (Mantido o código existente para PDF)
 }
 
 // Função para registrar atividade
 function registrar_atividade($conn, $usuario_id, $atividade) {
-    $stmt = $conn->prepare("INSERT INTO ga3_atividades (usuario_id, atividade) VALUES (?, ?)"); // Tabela alterada
+    $stmt = $conn->prepare("INSERT INTO ga3_atividades (usuario_id, atividade) VALUES (?, ?)");
     $stmt->bind_param("is", $usuario_id, $atividade);
     $stmt->execute();
     $stmt->close();
 }
 
 // Registrar atividade de visualização
-registrar_atividade($conn, $usuario['id'], 'Visualizou histórico de despesas');
+registrar_atividade($conn, $usuario['id'], 'Visualizou Histórico de despesas');
 
 $conn->close();
 
@@ -169,7 +191,7 @@ include 'dashboard_data.php';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Histórico de Despesas - Stockly</title>
+    <title>Custos de Estoque - Stockly</title>
     <link rel="stylesheet" href="../css/styleprincipal.css">
     <link rel="stylesheet" href="dashboard.css">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
@@ -178,7 +200,6 @@ include 'dashboard_data.php';
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <style>
-     ```css
      * {
     margin: 0;
     padding: 0;
@@ -211,8 +232,6 @@ body {
   --warning-color: #f39c12;
   --bg-secondary: #e9ecef;
 }
-
-
 
 h1 {
   color: var(--primary-color);
@@ -354,6 +373,19 @@ h1 {
   box-shadow: 0 0 0 2px rgba(41, 128, 185, 0.2);
 }
 
+.filter-group select,
+.filter-group input[type="text"],
+.filter-group input[type="number"],
+.filter-group input[type="date"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: border-color 0.3s;
+  background-color: white;
+}
+
 /* Botões */
 .filter-buttons {
   display: flex;
@@ -419,13 +451,13 @@ h1 {
   border-radius: 6px;
 }
 
-#tabela-despesas {
+#tabela-materiais {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
 }
 
-#tabela-despesas th {
+#tabela-materiais th {
   background-color: var(--primary-color);
   color: white;
   text-align: left;
@@ -433,26 +465,26 @@ h1 {
   font-weight: 500;
 }
 
-#tabela-despesas td {
+#tabela-materiais td {
   padding: 10px 15px;
   border-bottom: 1px solid var(--medium-gray);
 }
 
-#tabela-despesas tr:nth-child(even) {
+#tabela-materiais tr:nth-child(even) {
   background-color: var(--light-gray);
 }
 
-#tabela-despesas tr:hover {
+#tabela-materiais tr:hover {
   background-color: #e9f4fd;
   transition: background-color 0.3s;
 }
 
-#tabela-despesas tfoot {
+#tabela-materiais tfoot {
   font-weight: 700;
   background-color: var(--light-gray);
 }
 
-#tabela-despesas tfoot td {
+#tabela-materiais tfoot td {
   padding: 12px 15px;
 }
 
@@ -519,12 +551,12 @@ h1 {
     justify-content: center;
   }
 
-  #tabela-despesas {
+  #tabela-materiais {
     font-size: 12px;
   }
 
-  #tabela-despesas td, 
-  #tabela-despesas th {
+  #tabela-materiais td, 
+  #tabela-materiais th {
     padding: 8px 10px;
   }
 }
@@ -534,35 +566,49 @@ h1 {
 <body>
 
     <div class="content-wrapper">
-        <h1>Histórico de Despesas</h1>
+        <h1>Histórico de despesas</h1>
         
         <div class="filters-container">
             <form method="GET" action="" id="filtro-form" class="filter-form">
                 <div class="filter-group">
-                    <label for="material">Material:</label>
-                    <select id="material" name="material">
-                        <option value="">Todos os materiais</option>
-                        <?php foreach ($materiais as $material): ?>
-                            <option value="<?php echo $material['id']; ?>" 
-                                <?php echo ($filtro_material == $material['id']) ? 'selected' : ''; ?>>
-                                <?php echo $material['descricao']; ?>
+                    <label for="categoria">Categoria:</label>
+                    <select id="categoria" name="categoria">
+                        <option value="">Todas as categorias</option>
+                        <?php foreach ($categorias as $categoria): ?>
+                            <option value="<?php echo $categoria['id']; ?>" 
+                                <?php echo ($filtro_categoria == $categoria['id']) ? 'selected' : ''; ?>>
+                                <?php echo $categoria['nome']; ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
                 
                 <div class="filter-group">
-                    <label for="valor_min">Valor mínimo (R$):</label>
+                    <label for="valor_min">Valor unitário mínimo (R$):</label>
                     <input type="number" id="valor_min" name="valor_min" step="0.01" min="0" 
                         value="<?php echo $filtro_valor_min !== null ? $filtro_valor_min : ''; ?>" 
                         placeholder="Ex: 50,00">
                 </div>
                 
                 <div class="filter-group">
-                    <label for="valor_max">Valor máximo (R$):</label>
+                    <label for="valor_max">Valor unitário máximo (R$):</label>
                     <input type="number" id="valor_max" name="valor_max" step="0.01" min="0" 
                         value="<?php echo $filtro_valor_max !== null ? $filtro_valor_max : ''; ?>" 
                         placeholder="Ex: 500,00">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="quantidade_min">Quantidade mínima:</label>
+                    <input type="number" id="quantidade_min" name="quantidade_min" min="0" 
+                        value="<?php echo $filtro_quantidade_min !== null ? $filtro_quantidade_min : ''; ?>" 
+                        placeholder="Ex: 10">
+                </div>
+                
+                <div class="filter-group">
+                    <label for="quantidade_max">Quantidade máxima:</label>
+                    <input type="number" id="quantidade_max" name="quantidade_max" min="0" 
+                        value="<?php echo $filtro_quantidade_max !== null ? $filtro_quantidade_max : ''; ?>" 
+                        placeholder="Ex: 100">
                 </div>
                 
                 <div class="filter-group">
@@ -572,8 +618,12 @@ h1 {
                         <option value="id_asc" <?php echo $filtro_ordem == 'id_asc' ? 'selected' : ''; ?>>ID (mais antigo)</option>
                         <option value="material_asc" <?php echo $filtro_ordem == 'material_asc' ? 'selected' : ''; ?>>Material (A-Z)</option>
                         <option value="material_desc" <?php echo $filtro_ordem == 'material_desc' ? 'selected' : ''; ?>>Material (Z-A)</option>
-                        <option value="valor_asc" <?php echo $filtro_ordem == 'valor_asc' ? 'selected' : ''; ?>>Valor (menor para maior)</option>
-                        <option value="valor_desc" <?php echo $filtro_ordem == 'valor_desc' ? 'selected' : ''; ?>>Valor (maior para menor)</option>
+                        <option value="valor_asc" <?php echo $filtro_ordem == 'valor_asc' ? 'selected' : ''; ?>>Valor unitário (menor)</option>
+                        <option value="valor_desc" <?php echo $filtro_ordem == 'valor_desc' ? 'selected' : ''; ?>>Valor unitário (maior)</option>
+                        <option value="quantidade_asc" <?php echo $filtro_ordem == 'quantidade_asc' ? 'selected' : ''; ?>>Quantidade (menor)</option>
+                        <option value="quantidade_desc" <?php echo $filtro_ordem == 'quantidade_desc' ? 'selected' : ''; ?>>Quantidade (maior)</option>
+                        <option value="total_asc" <?php echo $filtro_ordem == 'total_asc' ? 'selected' : ''; ?>>Valor total (menor)</option>
+                        <option value="total_desc" <?php echo $filtro_ordem == 'total_desc' ? 'selected' : ''; ?>>Valor total (maior)</option>
                     </select>
                 </div>
                 
@@ -597,43 +647,52 @@ h1 {
         <div id="resultados">
             <div class="resultados-header">
                 <h2>Resultados</h2>
-                <p id="total_despesas">Total despesas: <span class="valor-destaque">R$ <?php echo number_format($total_despesas, 2, ',', '.'); ?></span></p>
+                <p id="total_custos">Total investido em estoque: <span class="valor-destaque">R$ <?php echo number_format($total_custos_estoque, 2, ',', '.'); ?></span></p>
             </div>
             
             <div class="table-responsive">
-                <table id="tabela-despesas">
+                <table id="tabela-materiais">
                     <thead>
                         <tr>
                             <th>ID</th>
+                            <th>Código</th>
                             <th>Material</th>
-                            <th>Valor da Despesa</th>
+                            <th>Categoria</th>
+                            <th>Quantidade</th>
+                            <th>Custo Unitário</th>
+                            <th>Valor Total</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <?php if (count($despesas) > 0): ?>
-                            <?php foreach ($despesas as $despesa): ?>
+                        <?php if (count($materiais) > 0): ?>
+                            <?php foreach ($materiais as $material): ?>
                                 <tr>
-                                    <td><?php echo $despesa['id']; ?></td>
-                                    <td><?php echo $despesa['descricao']; ?></td>
-                                    <td>R$ <?php echo number_format($despesa['valor'], 2, ',', '.'); ?></td>
+                                    <td><?php echo $material['id']; ?></td>
+                                    <td><?php echo $material['codigo_identificacao'] ?? '-'; ?></td>
+                                    <td><?php echo $material['descricao']; ?></td>
+                                    <td><?php echo $material['categoria_nome'] ?? 'Sem categoria'; ?></td>
+                                    <td><?php echo $material['quantidade']; ?></td>
+                                    <td>R$ <?php echo number_format($material['valor_unitario_estoque'], 2, ',', '.'); ?></td>
+                                    <td>R$ <?php echo number_format($material['valor_total_estoque'], 2, ',', '.'); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="3" class="no-data">Nenhum registro encontrado</td>
+                                <td colspan="7" class="no-data">Nenhum material encontrado</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="2">Total:</td>
-                            <td>R$ <?php echo number_format($total_despesas, 2, ',', '.'); ?></td>
+                            <td colspan="6">Total Investido:</td>
+                            <td>R$ <?php echo number_format($total_custos_estoque, 2, ',', '.'); ?></td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
         </div>
     </div>
+
 <!-- Footer (same as in the original file) -->
 <footer class="site-footer">
         <div class="container">
@@ -669,147 +728,203 @@ h1 {
         </div>
     </footer>
     <script>
-                // Função para mostrar/ocultar o menu dropdown
-                document.getElementById('dropdownButton').addEventListener('click', function() {
+        // Função para mostrar/ocultar o menu dropdown
+        document.getElementById('dropdownButton').addEventListener('click', function() {
             document.getElementById('dropdownContent').classList.toggle('show');
         });
-        // Função para limpar filtros
-        function limparFiltros() {
-            document.getElementById('material').value = '';
-            document.getElementById('valor_min').value = '';
-            document.getElementById('valor_max').value = '';
-            document.getElementById('ordem').value = 'id_desc';
-            document.getElementById('filtro-form').submit();
-        }
+        
+// Substitua a função limparFiltros() no histórico_despesas.php por esta:
+
+function limparFiltros() {
+    document.getElementById('categoria').value = '';
+    document.getElementById('valor_min').value = '';
+    document.getElementById('valor_max').value = '';
+    document.getElementById('quantidade_min').value = '';
+    document.getElementById('quantidade_max').value = '';
+    document.getElementById('ordem').value = 'id_desc';
+    document.getElementById('filtro-form').submit();
+}
         
         // Função para exportar para PDF
         function exportToPDF() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            
-            // Título do documento
-            doc.setFontSize(18);
-            doc.text('Histórico de Despesas - Stockly', 14, 20);
-            
-            // Data da exportação
-            const hoje = new Date();
-            doc.setFontSize(10);
-            doc.text(`Exportado em: ${hoje.toLocaleDateString('pt-BR')} ${hoje.toLocaleTimeString('pt-BR')}`, 14, 30);
-            
-            // Filtros aplicados
-            doc.setFontSize(10);
-            let filtroTexto = 'Filtros aplicados: ';
-            
-            // Material selecionado
-            const material = document.getElementById('material');
-            const materialTexto = material.options[material.selectedIndex].text;
-            filtroTexto += `Material: ${materialTexto}; `;
-            
-            // Valores mínimo e máximo
-            const valorMin = document.getElementById('valor_min').value;
-            const valorMax = document.getElementById('valor_max').value;
-            
-            if (valorMin) {
-                filtroTexto += `Valor mínimo: R$ ${valorMin}; `;
-            }
-            
-            if (valorMax) {
-                filtroTexto += `Valor máximo: R$ ${valorMax}; `;
-            }
-            
-            // Ordenação
-            const ordem = document.getElementById('ordem');
-            const ordemTexto = ordem.options[ordem.selectedIndex].text;
-            filtroTexto += `Ordenação: ${ordemTexto}`;
-            
-            doc.text(filtroTexto, 14, 35);
-            
-            // Adicionar tabela
-            const table = document.getElementById('tabela-despesas');
-            const totalDespesas = document.getElementById('total_despesas').innerText;
-            
-            // Criar o array para a tabela
-            const tableData = [];
-            const headers = ['ID', 'Material', 'Valor da Despesa'];
-            tableData.push(headers);
-            
-            // Adicionar dados da tabela
-            const rows = table.querySelectorAll('tbody tr');
-            if (rows.length > 0) {
-                rows.forEach(row => {
-                    const rowData = [];
-                    row.querySelectorAll('td').forEach(cell => {
-                        rowData.push(cell.innerText);
-                    });
-                    
-                    // Se o rowData tem conteúdo de "nenhum registro encontrado", não adicionar
-                    if (rowData.length === 1 && rowData[0].includes("Nenhum registro encontrado")) {
-                        // Não adicionar esta linha
-                    } else {
-                        tableData.push(rowData);
-                    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Header do documento com logo/título
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text('STOCKLY', 14, 15);
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text('Histórico de Despesas (Custos de Estoque)', 14, 25);
+    
+    // Linha separadora
+    doc.setLineWidth(0.5);
+    doc.line(14, 30, 196, 30);
+    
+    // Informações do relatório
+    const hoje = new Date();
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Relatório gerado em: ${hoje.toLocaleDateString('pt-BR')} às ${hoje.toLocaleTimeString('pt-BR')}`, 14, 38);
+    
+    // Seção de filtros
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text('Filtros Aplicados:', 14, 48);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    
+    let yPos = 54;
+    
+    // Categoria
+    const categoria = document.getElementById('categoria');
+    const categoriaTexto = categoria.options[categoria.selectedIndex].text;
+    doc.text(`• Categoria: ${categoriaTexto}`, 20, yPos);
+    yPos += 4;
+    
+    // Valores
+    const valorMin = document.getElementById('valor_min').value;
+    const valorMax = document.getElementById('valor_max').value;
+    if (valorMin) {
+        doc.text(`• Valor unitário mínimo: R$ ${valorMin}`, 20, yPos);
+        yPos += 4;
+    }
+    if (valorMax) {
+        doc.text(`• Valor unitário máximo: R$ ${valorMax}`, 20, yPos);
+        yPos += 4;
+    }
+    
+    // Quantidades
+    const quantidadeMin = document.getElementById('quantidade_min').value;
+    const quantidadeMax = document.getElementById('quantidade_max').value;
+    if (quantidadeMin) {
+        doc.text(`• Quantidade mínima: ${quantidadeMin}`, 20, yPos);
+        yPos += 4;
+    }
+    if (quantidadeMax) {
+        doc.text(`• Quantidade máxima: ${quantidadeMax}`, 20, yPos);
+        yPos += 4;
+    }
+    
+    // Ordenação
+    const ordem = document.getElementById('ordem');
+    const ordemTexto = ordem.options[ordem.selectedIndex].text;
+    doc.text(`• Ordenação: ${ordemTexto}`, 20, yPos);
+    
+    // Resumo
+    const totalCustos = document.getElementById('total_custos').innerText;
+    const totalInvestido = totalCustos.replace('Total investido em estoque: ', '');
+    
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text('Resumo:', 14, yPos + 10);
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Total investido em estoque: ${totalInvestido}`, 20, yPos + 16);
+    
+    // Preparar dados da tabela
+    const table = document.getElementById('tabela-materiais');
+    const headers = ['ID', 'Código', 'Material', 'Categoria', 'Qtd', 'Custo Unit.', 'Valor Total'];
+    const tableData = [];
+    
+    const rows = table.querySelectorAll('tbody tr');
+    if (rows.length > 0) {
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length > 1) {
+                const rowData = [];
+                cells.forEach(cell => {
+                    rowData.push(cell.innerText);
                 });
-            } else {
-                tableData.push(['Nenhum registro encontrado', '', '']);
+                tableData.push(rowData);
             }
-            
-            // Adicionar linha de total
-            tableData.push(['Total:', totalDespesas.replace('Total despesas: ', ''), '', '']);
-            
-            // Renderizar a tabela no PDF
-            doc.autoTable({
-                startY: 40,
-                head: [tableData[0]],
-                body: tableData.slice(1),
-                theme: 'grid',
-                styles: {
-                    fontSize: 8,
-                    cellPadding: 2,
-                    lineColor: [0, 0, 0],
-                    lineWidth: 0.1,
-                },
-                headStyles: {
-                    fillColor: [41, 128, 185],
-                    textColor: [255, 255, 255],
-                    fontStyle: 'bold',
-                },
-                footStyles: {
-                    fillColor: [240, 240, 240],
-                    fontStyle: 'bold',
-                },
-                alternateRowStyles: {
-                    fillColor: [245, 245, 245]
-                }
-            });
-            
-            // Salvar o PDF
-            doc.save(`historico_despesas_${hoje.toISOString().split('T')[0]}.pdf`);
-        }
-
+        });
+    }
+    
+    if (tableData.length === 0) {
+        tableData.push(['Nenhum material encontrado', '', '', '', '', '', '']);
+    }
+    
+    // Renderizar tabela
+    doc.autoTable({
+        head: [headers],
+        body: tableData,
+        startY: yPos + 25,
+        theme: 'grid',
+        styles: {
+            fontSize: 8,
+            cellPadding: 3,
+            lineColor: [128, 128, 128],
+            lineWidth: 0.1,
+        },
+        headStyles: {
+            fillColor: [42, 157, 143],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        alternateRowStyles: {
+            fillColor: [248, 249, 250]
+        },
+        foot: [[{
+            content: `TOTAL INVESTIDO: ${totalInvestido}`,
+            colSpan: 7,
+            styles: { 
+                fillColor: [42, 157, 143], 
+                textColor: [255, 255, 255], 
+                fontStyle: 'bold',
+                halign: 'center'
+            }
+        }]]
+    });
+    
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+        doc.text(`© ${new Date().getFullYear()} Stockly - Sistema de Gestão de Estoque`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 5, { align: 'center' });
+    }
+    
+    doc.save(`Stockly_Historico_Despesas_${hoje.toISOString().split('T')[0]}.pdf`);
+}
         // Dropdown menu
         document.addEventListener('DOMContentLoaded', function() {
             const dropdownButton = document.getElementById('dropdownButton');
             const dropdownContent = document.getElementById('dropdownContent');
             
-            dropdownButton.addEventListener('click', function() {
-                dropdownContent.classList.toggle('show');
-            });
-            
-            // Fechar o dropdown ao clicar fora
-            window.addEventListener('click', function(event) {
-                if (!event.target.matches('.dropbtn') && !event.target.matches('.perfil-foto')) {
-                    if (dropdownContent.classList.contains('show')) {
-                        dropdownContent.classList.remove('show');
+            if (dropdownButton && dropdownContent) {
+                dropdownButton.addEventListener('click', function() {
+                    dropdownContent.classList.toggle('show');
+                });
+                
+                // Fechar o dropdown ao clicar fora
+                window.addEventListener('click', function(event) {
+                    if (!event.target.matches('.dropbtn') && !event.target.matches('.perfil-foto')) {
+                        if (dropdownContent.classList.contains('show')) {
+                            dropdownContent.classList.remove('show');
+                        }
                     }
-                }
-            });
+                });
+            }
         });
 
         // Menu móvel
         function toggleMenu() {
             const offScreenMenu = document.querySelector('.off-screen-menu');
-            offScreenMenu.classList.toggle('active');
-            document.querySelector('.ham-menu').classList.toggle('active');
+            if (offScreenMenu) {
+                offScreenMenu.classList.toggle('active');
+                const hamMenu = document.querySelector('.ham-menu');
+                if (hamMenu) {
+                    hamMenu.classList.toggle('active');
+                }
+            }
         }
     </script>
     <script src="../js/app.js"></script>

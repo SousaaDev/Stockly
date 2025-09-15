@@ -40,10 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['registrar_venda'])) {
     // Validar os dados do formulário
     $material_id = $_POST['material'];
     $quantidade_venda = $_POST['quantidade_venda'];
-    $valor_unitario_estoque = str_replace(',', '.', $_POST['valor_unitario_estoque']);
+    $valor_unitario_venda_estimado = str_replace(',', '.', $_POST['valor_unitario_venda_estimado']);
     
     // Verificar se temos estoque suficiente
-    $sql_verifica_estoque = "SELECT quantidade, valor_unitario_estoque FROM ga3_materiais WHERE id = ?";
+    $sql_verifica_estoque = "SELECT quantidade, valor_unitario_venda_estimado FROM ga3_materiais WHERE id = ?";
     $stmt_verifica = $conn->prepare($sql_verifica_estoque);
     $stmt_verifica->bind_param("i", $material_id);
     $stmt_verifica->execute();
@@ -53,8 +53,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['registrar_venda'])) {
 
     if ($material && $material['quantidade'] >= $quantidade_venda) {
         // Calcular o valor total da venda e o lucro bruto
-        $valor_total_venda = $quantidade_venda * $valor_unitario_estoque;
-        $custo_total = $quantidade_venda * $material['valor_unitario_estoque'];
+        $valor_total_venda = $quantidade_venda * $valor_unitario_venda_estimado;
+        $custo_total = $quantidade_venda * $material['valor_unitario_venda_estimado'];
         $lucro_bruto = $valor_total_venda - $custo_total;
         $data_atual = date('Y-m-d');
         
@@ -156,7 +156,7 @@ $total_vendas_hoje = $vendas_hoje['total_vendas'] ?? 0;
 $valor_total_hoje = number_format(($vendas_hoje['valor_total'] ?? 0), 2, ',', '.');
 
 // Obter lista de materiais disponíveis
-$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_estoque, m.valor_unitario_estoque, c.nome as categoria 
+$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_venda_estimado, m.valor_unitario_venda_estimado, c.nome as categoria 
                  FROM ga3_materiais m 
                  LEFT JOIN ga3_categorias c ON m.categoria_id = c.id 
                  WHERE m.quantidade > 0 
@@ -185,7 +185,7 @@ while ($row = $result_ultimas_vendas->fetch_assoc()) {
 
 
 // Obter lista de materiais disponíveis
-$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_estoque, m.valor_unitario_estoque, c.nome as categoria 
+$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_venda_estimado, m.valor_unitario_venda_estimado, c.nome as categoria 
                  FROM ga3_materiais m 
                  LEFT JOIN ga3_categorias c ON m.categoria_id = c.id 
                  WHERE m.quantidade > 0 
@@ -701,7 +701,7 @@ h1 {
     <?php foreach($materiais as $material): ?>
         <option value="<?php echo $material['id']; ?>" 
                 data-quantity="<?php echo $material['quantidade']; ?>"
-                data-price="<?php echo $material['valor_unitario_estoque'] ? number_format($material['valor_unitario_estoque'], 2, ',', '.') : '0,00'; ?>">
+                data-price="<?php echo $material['valor_unitario_venda_estimado'] ? number_format($material['valor_unitario_venda_estimado'], 2, ',', '.') : '0,00'; ?>">
             <?php echo htmlspecialchars($material['descricao']); ?> (<?php echo $material['quantidade']; ?> un.)
         </option>
     <?php endforeach; ?>
@@ -716,8 +716,8 @@ h1 {
                         <i class="fas fa-info-circle"></i> Quantidade disponível: <span id="qtd-disp-valor">0</span>
                     </div>
                     
-                    <label for="valor_unitario_estoque"><i class="fas fa-dollar-sign"></i> Valor Unitário de Venda (R$):</label>
-                    <input type="text" id="valor_unitario_estoque" name="valor_unitario_estoque" required >
+                    <label for="valor_unitario_venda_estimado"><i class="fas fa-dollar-sign"></i> Valor Unitário de Venda (R$):</label>
+                    <input type="text" id="valor_unitario_venda_estimado" name="valor_unitario_venda_estimado" required >
             
                     <div class="form-actions">
                         <button type="submit" name="registrar_venda"><i class="fas fa-check"></i> Registrar Venda</button>
@@ -808,7 +808,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // ==================== ELEMENTOS DOM ====================
     const materialSelect = document.getElementById('material');
     const qtdInput = document.getElementById('quantidade_venda');
-    const valorInput = document.getElementById('valor_unitario_estoque');
+    const valorInput = document.getElementById('valor_unitario_venda_estimado');
     const transacaoForm = document.getElementById('transacao-form');
     const dropdownButton = document.getElementById('dropdownButton');
     const dropdownContent = document.getElementById('dropdownContent');

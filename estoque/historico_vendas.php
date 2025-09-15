@@ -774,110 +774,142 @@ body .filters-container {
 
         // Função para exportar para PDF
         function exportToPDF() {
-            // Importando as bibliotecas jsPDF
-            const { jsPDF } = window.jspdf;
-            
-            // Criando uma nova instância do PDF
-            const doc = new jsPDF();
-            
-            // Adicionando título
-            doc.setFontSize(18);
-            doc.text("Histórico de Vendas - Stockly", 14, 22);
-            
-            // Adicionando data e hora
-            const dataHoje = new Date();
-            const dataFormatada = dataHoje.toLocaleDateString('pt-BR');
-            const horaFormatada = dataHoje.toLocaleTimeString('pt-BR');
-            doc.setFontSize(10);
-            doc.text(`Relatório gerado em: ${dataFormatada} às ${horaFormatada}`, 14, 30);
-            
-            // Adicionando filtros aplicados
-            doc.setFontSize(12);
-            doc.text("Filtros aplicados:", 14, 40);
-            
-            let linha = 46;
-            const material = document.getElementById('material');
-            const materialSelecionado = material.options[material.selectedIndex];
-            if (material.value) {
-                doc.text(`Material: ${materialSelecionado.text}`, 20, linha);
-                linha += 6;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Header do documento com logo/título
+    doc.setFontSize(20);
+    doc.setFont("helvetica", "bold");
+    doc.text('STOCKLY', 14, 15);
+    
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "normal");
+    doc.text('Histórico de Vendas', 14, 25);
+    
+    // Linha separadora
+    doc.setLineWidth(0.5);
+    doc.line(14, 30, 196, 30);
+    
+    // Informações do relatório
+    const hoje = new Date();
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Relatório gerado em: ${hoje.toLocaleDateString('pt-BR')} às ${hoje.toLocaleTimeString('pt-BR')}`, 14, 38);
+    
+    // Seção de filtros
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text('Filtros Aplicados:', 14, 48);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    
+    let yPos = 54;
+    
+    // Material
+    const material = document.getElementById('material');
+    const materialTexto = material.options[material.selectedIndex].text;
+    doc.text(`• Material: ${materialTexto}`, 20, yPos);
+    yPos += 4;
+    
+    // Valores
+    const valorMin = document.getElementById('valor_min').value;
+    const valorMax = document.getElementById('valor_max').value;
+    if (valorMin) {
+        doc.text(`• Valor mínimo: R$ ${valorMin}`, 20, yPos);
+        yPos += 4;
+    }
+    if (valorMax) {
+        doc.text(`• Valor máximo: R$ ${valorMax}`, 20, yPos);
+        yPos += 4;
+    }
+    
+    // Ordenação
+    const ordem = document.getElementById('ordem');
+    const ordemTexto = ordem.options[ordem.selectedIndex].text;
+    doc.text(`• Ordenação: ${ordemTexto}`, 20, yPos);
+    
+    // Resumo
+    const totalVendas = document.querySelector('.resultados-header .valor-destaque').innerText;
+    const totalQuantidade = document.querySelectorAll('.resultados-header .valor-destaque')[1].innerText;
+    
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text('Resumo:', 14, yPos + 10);
+    
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Total de vendas: ${totalVendas}`, 20, yPos + 16);
+    doc.text(`Quantidade total vendida: ${totalQuantidade}`, 20, yPos + 22);
+    
+    // Preparar dados da tabela
+    const table = document.getElementById('tabela-vendas');
+    const headers = ['ID', 'Material', 'Qtd', 'Valor Unit.', 'Valor Total', 'Data da Venda'];
+    const tableData = [];
+    
+    const rows = table.querySelectorAll('tbody tr');
+    if (rows.length > 0) {
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length > 1) {
+                const rowData = [];
+                cells.forEach(cell => {
+                    rowData.push(cell.innerText);
+                });
+                tableData.push(rowData);
             }
-            
-            const valorMin = document.getElementById('valor_min').value;
-            if (valorMin) {
-                doc.text(`Valor mínimo: R$ ${valorMin}`, 20, linha);
-                linha += 6;
+        });
+    }
+    
+    if (tableData.length === 0) {
+        tableData.push(['Nenhuma venda encontrada', '', '', '', '', '']);
+    }
+    
+    // Renderizar tabela
+    doc.autoTable({
+        head: [headers],
+        body: tableData,
+        startY: yPos + 31,
+        theme: 'grid',
+        styles: {
+            fontSize: 8,
+            cellPadding: 3,
+            lineColor: [128, 128, 128],
+            lineWidth: 0.1,
+        },
+        headStyles: {
+            fillColor: [42, 157, 143],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        alternateRowStyles: {
+            fillColor: [248, 249, 250]
+        },
+        foot: [[{
+            content: `TOTAL VENDAS: ${totalVendas} | QUANTIDADE: ${totalQuantidade}`,
+            colSpan: 6,
+            styles: { 
+                fillColor: [42, 157, 143], 
+                textColor: [255, 255, 255], 
+                fontStyle: 'bold',
+                halign: 'center'
             }
-            
-            const valorMax = document.getElementById('valor_max').value;
-            if (valorMax) {
-                doc.text(`Valor máximo: R$ ${valorMax}`, 20, linha);
-                linha += 6;
-            }
-            
-            
-            
-            
-            // Resumo dos resultados
-            doc.setFontSize(12);
-            doc.text(`Total de vendas: R$ <?php echo number_format($total_vendas, 2, ',', '.'); ?>`, 14, linha + 6);
-            doc.text(`Quantidade total: <?php echo number_format($total_quantidade, 0, ',', '.'); ?> unidades`, 14, linha + 12);
-            
-            // Preparando os dados da tabela
-            const headers = [['ID', 'Material', 'Quantidade', 'Valor Unit. (R$)', 'Valor Total (R$)', 'Data da Venda']];
-            
-            const dados = [];
-            <?php foreach ($vendas as $venda): ?>
-                dados.push([
-                    '<?php echo $venda['id']; ?>', 
-                    '<?php echo addslashes(htmlspecialchars($venda['descricao'])); ?>', 
-                    '<?php echo number_format($venda['quantidade'], 0, ',', '.'); ?>', 
-                    '<?php echo number_format($venda['valor_unitario'], 2, ',', '.'); ?>',
-                    '<?php echo number_format($venda['valor_total'], 2, ',', '.'); ?>', 
-                    '<?php echo date('d/m/Y H:i', strtotime($venda['data_venda'])); ?>'
-                ]);
-            <?php endforeach; ?>
-            
-            // Adicionando a tabela ao PDF
-            doc.autoTable({
-                head: headers,
-                body: dados,
-                startY: linha + 18,
-                theme: 'grid',
-                styles: {
-                    fontSize: 8,
-                    cellPadding: 2
-                },
-                headStyles: {
-                    fillColor: [41, 128, 185],
-                    textColor: 255
-                },
-                footStyles: {
-                    fillColor: [235, 237, 239],
-                    textColor: [0, 0, 0],
-                    fontStyle: 'bold'
-                },
-                foot: [[
-                    'Total', 
-                    '', 
-                    '<?php echo number_format($total_quantidade, 0, ',', '.'); ?>', 
-                    '', 
-                    'R$ <?php echo number_format($total_vendas, 2, ',', '.'); ?>', 
-                    ''
-                ]]
-            });
-            
-            // Adicionando rodapé
-            const pageCount = doc.internal.getNumberOfPages();
-            for (let i = 1; i <= pageCount; i++) {
-                doc.setPage(i);
-                doc.setFontSize(8);
-                doc.text(`Página ${i} de ${pageCount} - Stockly © ${new Date().getFullYear()}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
-            }
-            
-            // Salvando o PDF
-            doc.save('historico_vendas_stockly.pdf');
-        }
+        }]]
+    });
+    
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 10, { align: 'center' });
+        doc.text(`© ${new Date().getFullYear()} Stockly - Sistema de Gestão de Estoque`, doc.internal.pageSize.width / 2, doc.internal.pageSize.height - 5, { align: 'center' });
+    }
+    
+    doc.save(`Stockly_Historico_Vendas_${hoje.toISOString().split('T')[0]}.pdf`);
+}
 
         // Dropdown menu
 document.addEventListener('DOMContentLoaded', function() {
