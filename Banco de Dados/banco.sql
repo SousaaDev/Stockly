@@ -25,15 +25,6 @@ CREATE TABLE ga3_usuarios (
     ultimo_login_falho DATETIME DEFAULT NULL
 );
 
--- Criar a tabela de sessões
-CREATE TABLE ga3_sessoes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    usuario_id INT,
-    token VARCHAR(255) UNIQUE NOT NULL,
-    expiracao DATETIME NOT NULL,
-    ip VARCHAR(45) DEFAULT NULL,
-    FOREIGN KEY (usuario_id) REFERENCES ga3_usuarios(id)
-);
 
 -- Criar a tabela de logs de login
 CREATE TABLE ga3_login_logs (
@@ -45,24 +36,7 @@ CREATE TABLE ga3_login_logs (
     FOREIGN KEY (usuario_id) REFERENCES ga3_usuarios(id)
 );
 
--- Criar a tabela de dados financeiros
-CREATE TABLE ga3_dados_financeiros (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    mes VARCHAR(50) NOT NULL,
-    vendas INT NOT NULL,
-    compras INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
 
--- Criar a tabela de estoque
-CREATE TABLE ga3_estoque (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    produto VARCHAR(255) NOT NULL,
-    quantidade INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
 
 -- Criar a tabela de atividades
 CREATE TABLE ga3_atividades (
@@ -125,12 +99,6 @@ CREATE TABLE ga3_vendas (
     lucro_bruto DECIMAL(10, 2) NOT NULL
 );
 
-CREATE TABLE ga3_produtos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    descricao VARCHAR(255) NOT NULL,
-    preco_unitario DECIMAL(10, 2) NOT NULL,
-    quantidade INT NOT NULL
-);
 
 ALTER TABLE ga3_materiais ADD COLUMN valor_unitario_venda DECIMAL(10,2) DEFAULT NULL;
 

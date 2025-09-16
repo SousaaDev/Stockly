@@ -7,7 +7,6 @@ if (!isset($_SESSION['usuario'])) {
 
 include 'dashboard_data.php';
 
-
 $usuario = $_SESSION['usuario'];
 
 // Verifica se a foto de perfil está definida, caso contrário, define uma padrão
@@ -40,10 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['registrar_venda'])) {
     // Validar os dados do formulário
     $material_id = $_POST['material'];
     $quantidade_venda = $_POST['quantidade_venda'];
-    $valor_unitario_venda_estimado = str_replace(',', '.', $_POST['valor_unitario_venda_estimado']);
+    $valor_unitario_venda_real = str_replace(',', '.', $_POST['valor_unitario_venda_estimado']);
     
-    // Verificar se temos estoque suficiente
-    $sql_verifica_estoque = "SELECT quantidade, valor_unitario_venda_estimado FROM ga3_materiais WHERE id = ?";
+    // Verificar se temos estoque suficiente e pegar o custo unitário
+    $sql_verifica_estoque = "SELECT quantidade, valor_unitario_estoque FROM ga3_materiais WHERE id = ?";
     $stmt_verifica = $conn->prepare($sql_verifica_estoque);
     $stmt_verifica->bind_param("i", $material_id);
     $stmt_verifica->execute();
@@ -52,10 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['registrar_venda'])) {
     $stmt_verifica->close();
 
     if ($material && $material['quantidade'] >= $quantidade_venda) {
-        // Calcular o valor total da venda e o lucro bruto
-        $valor_total_venda = $quantidade_venda * $valor_unitario_venda_estimado;
-        $custo_total = $quantidade_venda * $material['valor_unitario_venda_estimado'];
-        $lucro_bruto = $valor_total_venda - $custo_total;
+        // Calcular valores corretamente
+        $valor_total_venda = $quantidade_venda * $valor_unitario_venda_real; // Receita total
+        $custo_total = $quantidade_venda * $material['valor_unitario_estoque']; // Custo total baseado no preço de estoque
+        $lucro_bruto = $valor_total_venda - $custo_total; // Lucro = Receita - Custo
         $data_atual = date('Y-m-d');
         
         // Iniciar uma transação para garantir que ambas as operações sejam concluídas
@@ -107,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['registrar_venda'])) {
             $stmt_atualizar->close();
             
             // Registrar a atividade
-            registrar_atividade($conn, $usuario['id'], "Venda de {$quantidade_venda} unidades do material ID {$material_id}");
+            registrar_atividade($conn, $usuario['id'], "Venda de {$quantidade_venda} unidades do material ID {$material_id} - Lucro: R$ " . number_format($lucro_bruto, 2, ',', '.'));
             
             // Confirmar a transação
             $conn->commit();
@@ -141,7 +140,7 @@ if (isset($_GET['success']) && $_GET['success'] == '1') {
 
 // Obter informações de vendas do dia
 $hoje = date('Y-m-d');
-$sql_vendas_hoje = "SELECT COUNT(*) as total_vendas, SUM(valor_venda) as valor_total 
+$sql_vendas_hoje = "SELECT COUNT(*) as total_vendas, COALESCE(SUM(valor_venda), 0) as valor_total 
                     FROM ga3_transacoes 
                     WHERE DATE(data_venda) = ?";
 $stmt_vendas_hoje = $conn->prepare($sql_vendas_hoje);
@@ -151,12 +150,17 @@ $result_vendas_hoje = $stmt_vendas_hoje->get_result();
 $vendas_hoje = $result_vendas_hoje->fetch_assoc();
 $stmt_vendas_hoje->close();
 
-// Formatar os valores
-$total_vendas_hoje = $vendas_hoje['total_vendas'] ?? 0;
-$valor_total_hoje = number_format(($vendas_hoje['valor_total'] ?? 0), 2, ',', '.');
+// Garantir que as variáveis sempre tenham valores
+if (!$vendas_hoje) {
+    $vendas_hoje = array('total_vendas' => 0, 'valor_total' => 0);
+}
 
-// Obter lista de materiais disponíveis
-$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_venda_estimado, m.valor_unitario_venda_estimado, c.nome as categoria 
+// Formatar os valores
+$total_vendas_hoje = (int) ($vendas_hoje['total_vendas'] ?? 0);
+$valor_total_hoje = number_format((float) ($vendas_hoje['valor_total'] ?? 0), 2, ',', '.');
+
+// Obter lista de materiais disponíveis - corrigido para mostrar preço de venda estimado
+$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_estoque, m.valor_unitario_venda_estimado, c.nome as categoria 
                  FROM ga3_materiais m 
                  LEFT JOIN ga3_categorias c ON m.categoria_id = c.id 
                  WHERE m.quantidade > 0 
@@ -168,7 +172,6 @@ while ($row = $result_materiais->fetch_assoc()) {
     $materiais[] = $row;
 }
 
-// Obter as últimas vendas
 // Obter as últimas vendas
 $sql_ultimas_vendas = "SELECT t.id, t.material_id, m.descricao, t.quantidade, t.valor_venda, t.data_venda, t.data_hora 
                      FROM ga3_transacoes t 
@@ -182,20 +185,6 @@ while ($row = $result_ultimas_vendas->fetch_assoc()) {
     $ultimas_vendas[] = $row;
 }
 
-
-
-// Obter lista de materiais disponíveis
-$sql_materiais = "SELECT m.id, m.descricao, m.quantidade, m.valor_unitario_venda_estimado, m.valor_unitario_venda_estimado, c.nome as categoria 
-                 FROM ga3_materiais m 
-                 LEFT JOIN ga3_categorias c ON m.categoria_id = c.id 
-                 WHERE m.quantidade > 0 
-                 ORDER BY m.descricao";
-$result_materiais = $conn->query($sql_materiais);
-$materiais = [];
-
-while ($row = $result_materiais->fetch_assoc()) {
-    $materiais[] = $row;
-}   
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -701,8 +690,9 @@ h1 {
     <?php foreach($materiais as $material): ?>
         <option value="<?php echo $material['id']; ?>" 
                 data-quantity="<?php echo $material['quantidade']; ?>"
-                data-price="<?php echo $material['valor_unitario_venda_estimado'] ? number_format($material['valor_unitario_venda_estimado'], 2, ',', '.') : '0,00'; ?>">
-            <?php echo htmlspecialchars($material['descricao']); ?> (<?php echo $material['quantidade']; ?> un.)
+                data-price="<?php echo $material['valor_unitario_venda_estimado'] ? number_format($material['valor_unitario_venda_estimado'], 2, ',', '.') : '0,00'; ?>"
+                data-cost="<?php echo number_format($material['valor_unitario_estoque'], 2, ',', '.'); ?>">
+            <?php echo htmlspecialchars($material['descricao']); ?> (<?php echo $material['quantidade']; ?> un.) - Custo: R$ <?php echo number_format($material['valor_unitario_estoque'], 2, ',', '.'); ?>
         </option>
     <?php endforeach; ?>
 </select>
