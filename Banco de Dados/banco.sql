@@ -75,12 +75,10 @@ CREATE TABLE ga3_despesas (
     id INT AUTO_INCREMENT PRIMARY KEY,
     material_id INT NOT NULL,
     descricao VARCHAR(255) NOT NULL,
-    quantidade INT NOT NULL,
     valor DECIMAL(10, 2) NOT NULL,
-    categoria_id INT NULL,
     data_despesa DATE DEFAULT CURRENT_DATE,
     FOREIGN KEY (material_id) REFERENCES ga3_materiais(id),
-    CONSTRAINT fk_despesas_categoria FOREIGN KEY (categoria_id) REFERENCES ga3_categorias(id)
+
 );
 
 -- Criar a tabela de transações

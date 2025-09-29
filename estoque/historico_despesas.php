@@ -26,31 +26,22 @@ if (!isset($usuario['foto_perfil']) || empty($usuario['foto_perfil'])) {
     $usuario['foto_perfil'] = htmlspecialchars($usuario['foto_perfil']);
 }
 
-// Definir filtros
-$filtro_categoria = isset($_GET['categoria']) ? $_GET['categoria'] : null;
+// Definir filtros (removendo categoria)
 $filtro_valor_min = isset($_GET['valor_min']) ? $_GET['valor_min'] : null;
 $filtro_valor_max = isset($_GET['valor_max']) ? $_GET['valor_max'] : null;
 $filtro_data_inicio = isset($_GET['data_inicio']) ? $_GET['data_inicio'] : null;
 $filtro_data_fim = isset($_GET['data_fim']) ? $_GET['data_fim'] : null;
 $filtro_ordem = isset($_GET['ordem']) ? $_GET['ordem'] : 'id_desc';
 
-// Construir consulta SQL
+// Construir consulta SQL (sem categoria)
 $sql_where = [];
 $sql_params = [];
 $sql_types = "";
 
-$sql = "SELECT d.id, d.descricao, d.quantidade, d.valor, d.data_despesa,
-               m.descricao as material_descricao, m.codigo_identificacao,
-               c.nome as categoria_nome
+$sql = "SELECT d.id, d.descricao, d.valor, d.data_despesa,
+               m.descricao as material_descricao, m.codigo_identificacao
         FROM ga3_despesas d
-        INNER JOIN ga3_materiais m ON d.material_id = m.id
-        LEFT JOIN ga3_categorias c ON d.categoria_id = c.id";
-
-if ($filtro_categoria && $filtro_categoria !== '') {
-    $sql_where[] = "d.categoria_id = ?";
-    $sql_params[] = $filtro_categoria;
-    $sql_types .= "i";
-}
+        INNER JOIN ga3_materiais m ON d.material_id = m.id";
 
 if ($filtro_valor_min !== null && $filtro_valor_min !== '') {
     $sql_where[] = "d.valor >= ?";
@@ -100,12 +91,6 @@ switch ($filtro_ordem) {
     case 'valor_desc':
         $sql .= " ORDER BY d.valor DESC";
         break;
-    case 'quantidade_asc':
-        $sql .= " ORDER BY d.quantidade ASC";
-        break;
-    case 'quantidade_desc':
-        $sql .= " ORDER BY d.quantidade DESC";
-        break;
     default:
         $sql .= " ORDER BY d.id DESC";
 }
@@ -128,11 +113,10 @@ if ($result->num_rows > 0) {
     }
 }
 
-// Calcular total de despesas - corrigindo a consulta
+// Calcular total de despesas
 $sql_total = "SELECT SUM(d.valor) as total_despesas 
               FROM ga3_despesas d 
-              LEFT JOIN ga3_materiais m ON d.material_id = m.id
-              LEFT JOIN ga3_categorias c ON d.categoria_id = c.id";
+              LEFT JOIN ga3_materiais m ON d.material_id = m.id";
 
 if (!empty($sql_where)) {
     $sql_total .= " WHERE " . implode(" AND ", $sql_where);
@@ -151,17 +135,6 @@ $total_despesas = 0;
 if ($result_total->num_rows > 0) {
     $row = $result_total->fetch_assoc();
     $total_despesas = $row['total_despesas'] ?: 0;
-}
-
-// Obter categorias para filtro
-$sql_categorias = "SELECT id, nome FROM ga3_categorias ORDER BY nome ASC";
-$result_categorias = $conn->query($sql_categorias);
-$categorias = [];
-
-if ($result_categorias->num_rows > 0) {
-    while($row = $result_categorias->fetch_assoc()) {
-        $categorias[] = $row;
-    }
 }
 
 // Registrar atividade
@@ -467,19 +440,6 @@ h1 {
         <div class="filters-container">
             <form method="GET" action="" id="filtro-form" class="filter-form">
                 <div class="filter-group">
-                    <label for="categoria">Categoria:</label>
-                    <select id="categoria" name="categoria">
-                        <option value="">Todas as categorias</option>
-                        <?php foreach ($categorias as $categoria): ?>
-                            <option value="<?php echo $categoria['id']; ?>" 
-                                <?php echo ($filtro_categoria == $categoria['id']) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($categoria['nome']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                
-                <div class="filter-group">
                     <label for="valor_min">Valor mínimo (R$):</label>
                     <input type="number" id="valor_min" name="valor_min" step="0.01" min="0" 
                         value="<?php echo $filtro_valor_min !== null ? $filtro_valor_min : ''; ?>" 
@@ -514,8 +474,6 @@ h1 {
                         <option value="data_asc" <?php echo $filtro_ordem == 'data_asc' ? 'selected' : ''; ?>>Data (mais antiga)</option>
                         <option value="valor_desc" <?php echo $filtro_ordem == 'valor_desc' ? 'selected' : ''; ?>>Valor (maior)</option>
                         <option value="valor_asc" <?php echo $filtro_ordem == 'valor_asc' ? 'selected' : ''; ?>>Valor (menor)</option>
-                        <option value="quantidade_desc" <?php echo $filtro_ordem == 'quantidade_desc' ? 'selected' : ''; ?>>Quantidade (maior)</option>
-                        <option value="quantidade_asc" <?php echo $filtro_ordem == 'quantidade_asc' ? 'selected' : ''; ?>>Quantidade (menor)</option>
                     </select>
                 </div>
                 
@@ -551,8 +509,6 @@ h1 {
                             <th>Código Material</th>
                             <th>Material</th>
                             <th>Descrição</th>
-                            <th>Categoria</th>
-                            <th>Quantidade</th>
                             <th>Valor</th>
                         </tr>
                     </thead>
@@ -565,20 +521,18 @@ h1 {
                                     <td><?php echo htmlspecialchars($despesa['codigo_identificacao'] ?? '-'); ?></td>
                                     <td><?php echo htmlspecialchars($despesa['material_descricao']); ?></td>
                                     <td><?php echo htmlspecialchars($despesa['descricao']); ?></td>
-                                    <td><?php echo htmlspecialchars($despesa['categoria_nome'] ?? 'Sem categoria'); ?></td>
-                                    <td><?php echo $despesa['quantidade']; ?></td>
                                     <td>R$ <?php echo number_format($despesa['valor'], 2, ',', '.'); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php else: ?>
                             <tr>
-                                <td colspan="8" class="no-data">Nenhuma despesa encontrada</td>
+                                <td colspan="6" class="no-data">Nenhuma despesa encontrada</td>
                             </tr>
                         <?php endif; ?>
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="7">Total de Despesas:</td>
+                            <td colspan="5">Total de Despesas:</td>
                             <td>R$ <?php echo number_format($total_despesas, 2, ',', '.'); ?></td>
                         </tr>
                     </tfoot>
@@ -627,7 +581,6 @@ h1 {
         });
 
         function limparFiltros() {
-            document.getElementById('categoria').value = '';
             document.getElementById('valor_min').value = '';
             document.getElementById('valor_max').value = '';
             document.getElementById('data_inicio').value = '';
@@ -664,11 +617,6 @@ h1 {
             doc.setFont("helvetica", "normal");
             
             let yPos = 54;
-            
-            const categoria = document.getElementById('categoria');
-            const categoriaTexto = categoria.options[categoria.selectedIndex].text;
-            doc.text(`• Categoria: ${categoriaTexto}`, 20, yPos);
-            yPos += 4;
             
             const valorMin = document.getElementById('valor_min').value;
             const valorMax = document.getElementById('valor_max').value;
@@ -708,7 +656,7 @@ h1 {
             doc.text(`Total de Despesas: ${totalTexto}`, 20, yPos + 16);
             
             const table = document.getElementById('tabela-despesas');
-            const headers = ['ID', 'Data', 'Cód.', 'Material', 'Descrição', 'Categoria', 'Qtd', 'Valor'];
+            const headers = ['ID', 'Data', 'Cód.', 'Material', 'Descrição', 'Valor'];
             const tableData = [];
             
             const rows = table.querySelectorAll('tbody tr');
@@ -726,7 +674,7 @@ h1 {
             }
             
             if (tableData.length === 0) {
-                tableData.push(['Nenhuma despesa encontrada', '', '', '', '', '', '', '']);
+                tableData.push(['Nenhuma despesa encontrada', '', '', '', '', '']);
             }
             
             doc.autoTable({
@@ -751,7 +699,7 @@ h1 {
                 },
                 foot: [[{
                     content: `TOTAL DE DESPESAS: ${totalTexto}`,
-                    colSpan: 8,
+                    colSpan: 6,
                     styles: { 
                         fillColor: [231, 76, 60], 
                         textColor: [255, 255, 255], 

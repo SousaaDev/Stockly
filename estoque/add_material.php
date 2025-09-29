@@ -5,20 +5,16 @@ $username = "root";
 $password = "";
 $dbname = "ga3_stockly";
 
-// Criar conexão
 $conn = new mysqli($servername, $username, $password, $dbname);
 
-// Verificar conexão
 if ($conn->connect_error) {
     die(json_encode(["success" => false, "message" => "Falha na conexão: " . $conn->connect_error]));
 }
 
-// Verificar se o usuário está logado
 if (!isset($_SESSION['usuario'])) {
     die(json_encode(["success" => false, "message" => "Usuário não autenticado"]));
 }
 
-// Validar dados recebidos
 if (!isset($_POST['descricao']) || empty(trim($_POST['descricao']))) {
     die(json_encode(["success" => false, "message" => "Descrição do material é obrigatória"]));
 }
@@ -29,7 +25,6 @@ $valor_unitario = isset($_POST['valor_unitario']) ? floatval($_POST['valor_unita
 $valor_unitario_venda_estimado = isset($_POST['valor_unitario_venda_estimado']) ? floatval($_POST['valor_unitario_venda_estimado']) : 0;
 $categoria_id = isset($_POST['categoria_id']) && !empty($_POST['categoria_id']) ? intval($_POST['categoria_id']) : null;
 
-// Validações
 if ($quantidade < 0) {
     die(json_encode(["success" => false, "message" => "Quantidade não pode ser negativa"]));
 }
@@ -43,20 +38,24 @@ if ($valor_unitario_venda_estimado < 0) {
 }
 
 // Verificar se o material já existe
-$sql = "SELECT id, codigo_identificacao, quantidade, valor_unitario_estoque FROM ga3_materiais WHERE descricao = ?";
+$sql = "SELECT id, codigo_identificacao, quantidade, valor_unitario_estoque, categoria_id FROM ga3_materiais WHERE descricao = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("s", $descricao);
 $stmt->execute();
 $result = $stmt->get_result();
 
 if ($result->num_rows > 0) {
-    // Material já existe - ATUALIZAR
+    // MATERIAL JÁ EXISTE
     $row = $result->fetch_assoc();
     $material_id = $row['id'];
     $quantidade_anterior = $row['quantidade'];
     $valor_anterior = $row['valor_unitario_estoque'];
     
-    // Calcular novo valor médio ponderado
+    // Se não informou categoria, usa a existente do material
+    if ($categoria_id === null) {
+        $categoria_id = $row['categoria_id'];
+    }
+    
     $valor_total_anterior = $quantidade_anterior * $valor_anterior;
     $valor_total_novo = $quantidade * $valor_unitario;
     $quantidade_total = $quantidade_anterior + $quantidade;
@@ -68,44 +67,29 @@ if ($result->num_rows > 0) {
     }
     
     // Atualizar material
-    if ($categoria_id !== null) {
-        $sql_update = "UPDATE ga3_materiais SET 
-                       quantidade = quantidade + ?, 
-                       valor_unitario_estoque = ?,
-                       valor_unitario_venda_estimado = ?,
-                       categoria_id = ?
-                       WHERE id = ?";
-        $stmt_update = $conn->prepare($sql_update);
-        $stmt_update->bind_param("iddii", $quantidade, $novo_valor_medio, $valor_unitario_venda_estimado, $categoria_id, $material_id);
-    } else {
-        $sql_update = "UPDATE ga3_materiais SET 
-                       quantidade = quantidade + ?, 
-                       valor_unitario_estoque = ?,
-                       valor_unitario_venda_estimado = ?
-                       WHERE id = ?";
-        $stmt_update = $conn->prepare($sql_update);
-        $stmt_update->bind_param("iddi", $quantidade, $novo_valor_medio, $valor_unitario_venda_estimado, $material_id);
-    }
+    $sql_update = "UPDATE ga3_materiais SET 
+                   quantidade = quantidade + ?, 
+                   valor_unitario_estoque = ?,
+                   valor_unitario_venda_estimado = ?,
+                   categoria_id = ?
+                   WHERE id = ?";
+    $stmt_update = $conn->prepare($sql_update);
+    $stmt_update->bind_param("iddii", $quantidade, $novo_valor_medio, $valor_unitario_venda_estimado, $categoria_id, $material_id);
     
     if ($stmt_update->execute()) {
-        // Registrar despesa se houver quantidade e valor
-        if ($quantidade > 0 && $valor_unitario > 0) {
-            $valor_total_despesa = $quantidade * $valor_unitario;
-            $descricao_despesa = "Compra de estoque - " . $descricao;
-            
-            $sql_despesa = "INSERT INTO ga3_despesas (material_id, descricao, quantidade, valor, categoria_id, data_despesa) 
-                           VALUES (?, ?, ?, ?, ?, CURDATE())";
-            $stmt_despesa = $conn->prepare($sql_despesa);
-            
-            if ($categoria_id !== null) {
-                $stmt_despesa->bind_param("isidi", $material_id, $descricao_despesa, $quantidade, $valor_total_despesa, $categoria_id);
-            } else {
-                $stmt_despesa->bind_param("isids", $material_id, $descricao_despesa, $quantidade, $valor_total_despesa, $categoria_id);
-            }
-            
-            $stmt_despesa->execute();
-            $stmt_despesa->close();
+        // Registrar despesa SEM quantidade e categoria_id
+        $valor_total_despesa = $quantidade * $valor_unitario;
+        $descricao_despesa = "Adição de estoque: " . $quantidade . " unidades de " . $descricao . " (Código: " . $row['codigo_identificacao'] . ")";
+        
+        $sql_despesa = "INSERT INTO ga3_despesas (material_id, descricao, valor, data_despesa) 
+                       VALUES (?, ?, ?, CURDATE())";
+        $stmt_despesa = $conn->prepare($sql_despesa);
+        $stmt_despesa->bind_param("isd", $material_id, $descricao_despesa, $valor_total_despesa);
+        
+        if (!$stmt_despesa->execute()) {
+            error_log("ERRO AO INSERIR DESPESA: " . $stmt_despesa->error);
         }
+        $stmt_despesa->close();
         
         // Registrar atividade
         if (isset($_SESSION['usuario']['id'])) {
@@ -131,9 +115,7 @@ if ($result->num_rows > 0) {
     $stmt_update->close();
     
 } else {
-    // Material não existe - CRIAR NOVO
-    
-    // Obter prefixo da categoria
+    // MATERIAL NOVO
     $prefixo_categoria = "GEN";
     
     if ($categoria_id !== null) {
@@ -147,7 +129,6 @@ if ($result->num_rows > 0) {
             $row_categoria = $result_categoria->fetch_assoc();
             $nome_categoria = $row_categoria['nome'];
             
-            // Criar abreviação da categoria
             $palavras = explode(' ', $nome_categoria);
             $prefixo_categoria = "";
             
@@ -166,7 +147,6 @@ if ($result->num_rows > 0) {
         $stmt_cat->close();
     }
     
-    // Criar abreviação do material
     $palavras_material = explode(' ', $descricao);
     $prefixo_material = "";
     
@@ -181,11 +161,8 @@ if ($result->num_rows > 0) {
     }
     
     $prefixo_material = substr($prefixo_material, 0, 3);
-    
-    // Combinar prefixos
     $prefixo = "{$prefixo_categoria}-{$prefixo_material}";
     
-    // Obter último número sequencial
     $sql_ultimo_codigo = "SELECT codigo_identificacao FROM ga3_materiais 
                           WHERE codigo_identificacao LIKE ? 
                           ORDER BY id DESC LIMIT 1";
@@ -214,34 +191,24 @@ if ($result->num_rows > 0) {
     $sql_insert = "INSERT INTO ga3_materiais (descricao, quantidade, valor_unitario_estoque, valor_unitario_venda_estimado, categoria_id, codigo_identificacao) 
                   VALUES (?, ?, ?, ?, ?, ?)";
     $stmt_insert = $conn->prepare($sql_insert);
-    
-    if ($categoria_id !== null) {
-        $stmt_insert->bind_param("siddis", $descricao, $quantidade, $valor_unitario, $valor_unitario_venda_estimado, $categoria_id, $codigo_identificacao);
-    } else {
-        $stmt_insert->bind_param("siddss", $descricao, $quantidade, $valor_unitario, $valor_unitario_venda_estimado, $categoria_id, $codigo_identificacao);
-    }
+    $stmt_insert->bind_param("siddis", $descricao, $quantidade, $valor_unitario, $valor_unitario_venda_estimado, $categoria_id, $codigo_identificacao);
     
     if ($stmt_insert->execute()) {
         $material_id = $conn->insert_id;
         
-        // Registrar despesa se houver quantidade e valor
-        if ($quantidade > 0 && $valor_unitario > 0) {
-            $valor_total_despesa = $quantidade * $valor_unitario;
-            $descricao_despesa = "Compra de estoque - " . $descricao;
-            
-            $sql_despesa = "INSERT INTO ga3_despesas (material_id, descricao, quantidade, valor, categoria_id, data_despesa) 
-                           VALUES (?, ?, ?, ?, ?, CURDATE())";
-            $stmt_despesa = $conn->prepare($sql_despesa);
-            
-            if ($categoria_id !== null) {
-                $stmt_despesa->bind_param("isidi", $material_id, $descricao_despesa, $quantidade, $valor_total_despesa, $categoria_id);
-            } else {
-                $stmt_despesa->bind_param("isids", $material_id, $descricao_despesa, $quantidade, $valor_total_despesa, $categoria_id);
-            }
-            
-            $stmt_despesa->execute();
-            $stmt_despesa->close();
+        // Registrar despesa SEM quantidade e categoria_id
+        $valor_total_despesa = $quantidade * $valor_unitario;
+        $descricao_despesa = "Adição de estoque: " . $quantidade . " unidades de " . $descricao . " (Código: " . $codigo_identificacao . ")";
+        
+        $sql_despesa = "INSERT INTO ga3_despesas (material_id, descricao, valor, data_despesa) 
+                       VALUES (?, ?, ?, CURDATE())";
+        $stmt_despesa = $conn->prepare($sql_despesa);
+        $stmt_despesa->bind_param("isd", $material_id, $descricao_despesa, $valor_total_despesa);
+        
+        if (!$stmt_despesa->execute()) {
+            error_log("ERRO AO INSERIR DESPESA: " . $stmt_despesa->error);
         }
+        $stmt_despesa->close();
         
         // Registrar atividade
         if (isset($_SESSION['usuario']['id'])) {
