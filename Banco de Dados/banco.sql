@@ -26,6 +26,16 @@ CREATE TABLE ga3_usuarios (
 );
 
 
+-- Criar a tabela de sessões
+CREATE TABLE ga3_sessoes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT,
+    token VARCHAR(255) UNIQUE NOT NULL,
+    expiracao DATETIME NOT NULL,
+    ip VARCHAR(45) DEFAULT NULL,
+    FOREIGN KEY (usuario_id) REFERENCES ga3_usuarios(id)
+);
+
 -- Criar a tabela de logs de login
 CREATE TABLE ga3_login_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -56,16 +66,21 @@ CREATE TABLE ga3_materiais (
     valor_unitario_venda_estimado DECIMAL(10, 2) NOT NULL,
     categoria_id INT,
     codigo_identificacao VARCHAR(20),
+    valor_unitario_venda DECIMAL(10,2) DEFAULT NULL,
     FOREIGN KEY (categoria_id) REFERENCES ga3_categorias(id)
 );
 
--- Criar a tabela de despesas
+-- Criar a tabela de despesas (estrutura corrigida)
 CREATE TABLE ga3_despesas (
     id INT AUTO_INCREMENT PRIMARY KEY,
     material_id INT NOT NULL,
+    descricao VARCHAR(255) NOT NULL,
+    quantidade INT NOT NULL,
     valor DECIMAL(10, 2) NOT NULL,
+    categoria_id INT NULL,
     data_despesa DATE DEFAULT CURRENT_DATE,
-    FOREIGN KEY (material_id) REFERENCES ga3_materiais(id)
+    FOREIGN KEY (material_id) REFERENCES ga3_materiais(id),
+    CONSTRAINT fk_despesas_categoria FOREIGN KEY (categoria_id) REFERENCES ga3_categorias(id)
 );
 
 -- Criar a tabela de transações
@@ -78,7 +93,9 @@ CREATE TABLE ga3_transacoes (
     data_hora DATETIME NOT NULL,
     lucro_bruto DECIMAL(10, 2) GENERATED ALWAYS AS (valor_venda - custo_material) STORED,
     data_venda DATE NOT NULL,
-    FOREIGN KEY (material_id) REFERENCES ga3_materiais(id)
+    usuario_id INT,
+    FOREIGN KEY (material_id) REFERENCES ga3_materiais(id),
+    CONSTRAINT fk_usuario_id FOREIGN KEY (usuario_id) REFERENCES ga3_usuarios(id)
 );
 
 -- Criar a tabela de contato
@@ -92,6 +109,7 @@ CREATE TABLE ga3_contato (
     data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Criar a tabela de vendas
 CREATE TABLE ga3_vendas (
     id INT AUTO_INCREMENT PRIMARY KEY,
     data_venda DATE NOT NULL,
@@ -99,15 +117,6 @@ CREATE TABLE ga3_vendas (
     lucro_bruto DECIMAL(10, 2) NOT NULL
 );
 
-
-ALTER TABLE ga3_materiais ADD COLUMN valor_unitario_venda DECIMAL(10,2) DEFAULT NULL;
-
-ALTER TABLE ga3_transacoes
-ADD COLUMN usuario_id INT,
-ADD CONSTRAINT fk_usuario_id
-FOREIGN KEY (usuario_id) REFERENCES ga3_usuarios(id);
-
 -- Cadastro do usuário admin
 INSERT INTO ga3_usuarios (nome, email, senha, cargo, data_nascimento, endereco) 
 VALUES ('admin', 'admin@gmail.com', '$2y$10$8UvwgAchHvpd3cLhdTBzNOjVevLEl0v2XcEwz2w7Z0raJNVwhWRH.', 'chefe', '1975-06-20', 'Av. Principal, 1000');
-
