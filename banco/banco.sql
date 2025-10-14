@@ -77,8 +77,20 @@ CREATE TABLE ga3_despesas (
     descricao VARCHAR(255) NOT NULL,
     valor DECIMAL(10, 2) NOT NULL,
     data_despesa DATE DEFAULT CURRENT_DATE,
-    FOREIGN KEY (material_id) REFERENCES ga3_materiais(id),
+    FOREIGN KEY (material_id) REFERENCES ga3_materiais(id)
+);
 
+-- Criar a tabela de recuperação de senha (CORRIGIDO)
+CREATE TABLE ga3_recuperacao_senha (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    usuario_id INT NOT NULL,
+    codigo VARCHAR(6) DEFAULT NULL,
+    token VARCHAR(64) DEFAULT NULL,
+    expiracao DATETIME NOT NULL,
+    usado BOOLEAN DEFAULT FALSE,
+    tentativas INT DEFAULT 0,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario_id) REFERENCES ga3_usuarios(id)
 );
 
 -- Criar a tabela de transações

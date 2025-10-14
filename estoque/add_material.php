@@ -76,41 +76,7 @@ if ($result->num_rows > 0) {
     $stmt_update = $conn->prepare($sql_update);
     $stmt_update->bind_param("iddii", $quantidade, $novo_valor_medio, $valor_unitario_venda_estimado, $categoria_id, $material_id);
     
-    if ($stmt_update->execute()) {
-        // Registrar despesa SEM quantidade e categoria_id
-        $valor_total_despesa = $quantidade * $valor_unitario;
-        $descricao_despesa = "Adição de estoque: " . $quantidade . " unidades de " . $descricao . " (Código: " . $row['codigo_identificacao'] . ")";
-        
-        $sql_despesa = "INSERT INTO ga3_despesas (material_id, descricao, valor, data_despesa) 
-                       VALUES (?, ?, ?, CURDATE())";
-        $stmt_despesa = $conn->prepare($sql_despesa);
-        $stmt_despesa->bind_param("isd", $material_id, $descricao_despesa, $valor_total_despesa);
-        
-        if (!$stmt_despesa->execute()) {
-            error_log("ERRO AO INSERIR DESPESA: " . $stmt_despesa->error);
-        }
-        $stmt_despesa->close();
-        
-        // Registrar atividade
-        if (isset($_SESSION['usuario']['id'])) {
-            $usuario_id = $_SESSION['usuario']['id'];
-            $atividade = "Atualizou material: {$descricao} (+{$quantidade} unidades)";
-            $sql_atividade = "INSERT INTO ga3_atividades (usuario_id, atividade) VALUES (?, ?)";
-            $stmt_atividade = $conn->prepare($sql_atividade);
-            $stmt_atividade->bind_param("is", $usuario_id, $atividade);
-            $stmt_atividade->execute();
-            $stmt_atividade->close();
-        }
-        
-        echo json_encode([
-            "success" => true, 
-            "message" => "Material atualizado com sucesso!",
-            "codigo" => $row['codigo_identificacao'],
-            "material_id" => $material_id
-        ]);
-    } else {
-        echo json_encode(["success" => false, "message" => "Erro ao atualizar material: " . $conn->error]);
-    }
+
     
     $stmt_update->close();
     

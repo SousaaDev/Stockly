@@ -240,7 +240,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <input type="checkbox" id="lembrar" name="lembrar">
                                 <label for="lembrar">Lembrar de mim</label>
                             </div>
-                            <a href="recuperar-senha.php" class="forgot-password">Esqueceu a senha?</a>
+                            <a href="php/recuperar-senha.php" class="forgot-password">Esqueceu a senha?</a>
                         </div>
                         
                         <div class="form-action">
